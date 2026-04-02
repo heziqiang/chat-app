@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+coverage/
+.env
+.env.*
+*.local
+*.tsbuildinfo
+.DS_Store
+.claude/
+assignment/
+plan/
+CLAUDE.md
+AGENTS.md

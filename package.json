@@ -1,0 +1,12 @@
+{
+  "name": "gradual-chat-app",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "sh -c 'trap \"kill 0\" EXIT; npm run dev:server & npm run dev:client & wait'",
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "install:all": "cd server && npm install && cd ../client && npm install",
+    "seed": "cd server && npm run seed"
+  }
+}
