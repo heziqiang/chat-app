@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { type Express } from 'express';
 import http from 'http';
 import mongoose from 'mongoose';
 import cors from 'cors';
@@ -11,9 +11,11 @@ const PORT = process.env.PORT || 4000;
 const MONGODB_URI =
   process.env.MONGODB_URI || 'mongodb://localhost:27017/gradual-chat';
 
-async function start() {
+export async function createApp(): Promise<{
+  app: Express;
+  apollo: ApolloServer<GqlContext>;
+}> {
   const app = express();
-  const httpServer = http.createServer(app);
 
   app.use(cors());
   app.use(express.json());
@@ -21,18 +23,6 @@ async function start() {
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
   });
-
-  await mongoose.connect(MONGODB_URI);
-  console.log('Connected to MongoDB');
-
-  // Ensure all model indexes exist on fresh DB
-  await Promise.all([
-    User.syncIndexes(),
-    Channel.syncIndexes(),
-    Message.syncIndexes(),
-    ReadStatus.syncIndexes(),
-  ]);
-  console.log('Database indexes synced');
 
   // Apollo Server
   const apollo = new ApolloServer<GqlContext>({ typeDefs, resolvers });
@@ -47,6 +37,35 @@ async function start() {
     }),
   );
 
+  return { app, apollo };
+}
+
+export async function connectToDatabase(uri = MONGODB_URI) {
+  if (mongoose.connection.readyState !== 0) {
+    await mongoose.disconnect();
+  }
+
+  await mongoose.connect(uri);
+  console.log('Connected to MongoDB');
+}
+
+export async function syncModelIndexes() {
+  await Promise.all([
+    User.syncIndexes(),
+    Channel.syncIndexes(),
+    Message.syncIndexes(),
+    ReadStatus.syncIndexes(),
+  ]);
+  console.log('Database indexes synced');
+}
+
+export async function start() {
+  const { app } = await createApp();
+  const httpServer = http.createServer(app);
+
+  await connectToDatabase(MONGODB_URI);
+  await syncModelIndexes();
+
   // Socket.io will be wired in Slice 6
 
   httpServer.listen(PORT, () => {
@@ -54,7 +73,9 @@ async function start() {
   });
 }
 
-start().catch((err) => {
-  console.error('Failed to start server:', err);
-  process.exit(1);
-});
+if (require.main === module) {
+  start().catch((err) => {
+    console.error('Failed to start server:', err);
+    process.exit(1);
+  });
+}

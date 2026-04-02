@@ -1,22 +1,60 @@
-import mongoose from 'mongoose';
-import { User, Channel, Message } from '../models';
+import mongoose, { type HydratedDocument } from 'mongoose';
+import { User, Channel, Message, ReadStatus } from '../models';
+import type { IUser, IChannel, IMessage } from '../models';
 
 const MONGODB_URI =
   process.env.MONGODB_URI || 'mongodb://localhost:27017/gradual-chat';
 
-async function seed() {
-  await mongoose.connect(MONGODB_URI);
-  console.log('Connected to MongoDB');
+type UserDoc = HydratedDocument<IUser>;
+type ChannelDoc = HydratedDocument<IChannel>;
+type MessageDoc = HydratedDocument<IMessage>;
 
-  // Clear existing data
+export interface SeedFixtures {
+  users: {
+    alice: UserDoc;
+    bob: UserDoc;
+    carol: UserDoc;
+    dave: UserDoc;
+  };
+  channels: {
+    general: ChannelDoc;
+    engineering: ChannelDoc;
+    design: ChannelDoc;
+  };
+  messages: {
+    general: MessageDoc[];
+    engineering: MessageDoc[];
+    design: MessageDoc[];
+  };
+}
+
+export async function clearDatabase() {
   await Promise.all([
     User.deleteMany({}),
     Channel.deleteMany({}),
     Message.deleteMany({}),
+    ReadStatus.deleteMany({}),
   ]);
   console.log('Cleared existing data');
+}
 
-  // Users
+export async function seedDatabase(): Promise<SeedFixtures> {
+  const sendMessages = async (
+    items: {
+      channelId: mongoose.Types.ObjectId;
+      senderId: mongoose.Types.ObjectId;
+      content: string;
+      replyToId?: mongoose.Types.ObjectId;
+    }[],
+  ): Promise<MessageDoc[]> => {
+    const created: MessageDoc[] = [];
+    for (const item of items) {
+      const msg = await Message.create(item);
+      created.push(msg);
+    }
+    return created;
+  };
+
   const [alice, bob, carol, dave] = await User.insertMany([
     {
       username: 'alice',
@@ -45,7 +83,6 @@ async function seed() {
   ]);
   console.log(`Seeded ${4} users`);
 
-  // Channels
   const [general, engineering, design] = await Channel.insertMany([
     {
       name: 'general',
@@ -62,20 +99,6 @@ async function seed() {
   ]);
   console.log(`Seeded ${3} channels`);
 
-  // Messages
-  // Helper: insert sequentially so _id order = chronological order
-  async function sendMessages(
-    items: { channelId: mongoose.Types.ObjectId; senderId: mongoose.Types.ObjectId; content: string; replyToId?: mongoose.Types.ObjectId }[],
-  ) {
-    const created: mongoose.Document[] = [];
-    for (const item of items) {
-      const msg = await Message.create(item);
-      created.push(msg);
-    }
-    return created;
-  }
-
-  // #general — 6 messages
   const generalMsgs = await sendMessages([
     { channelId: general._id, senderId: alice._id, content: 'Welcome to Gradual Chat! 🎉' },
     { channelId: general._id, senderId: bob._id, content: 'Hey everyone, excited to be here.' },
@@ -85,7 +108,6 @@ async function seed() {
     { channelId: general._id, senderId: bob._id, content: 'I pushed the API changes this morning, feel free to test.' },
   ]);
 
-  // #engineering — 5 messages, including 1 quote reply
   const engMsgs = await sendMessages([
     { channelId: engineering._id, senderId: bob._id, content: 'Deployed v2.1 to staging. Please smoke test when you get a chance.' },
     { channelId: engineering._id, senderId: alice._id, content: 'On it. Any known issues?' },
@@ -93,17 +115,15 @@ async function seed() {
     { channelId: engineering._id, senderId: carol._id, content: 'Is the pagination endpoint stable? Frontend team wants to integrate.' },
     { channelId: engineering._id, senderId: bob._id, content: 'Yes, cursor-based pagination is solid. Go ahead and integrate.' },
   ]);
-  // Quote reply in #engineering
   await sendMessages([
     {
       channelId: engineering._id,
       senderId: alice._id,
       content: 'Nice, I confirmed the fix on staging. Looks good to ship.',
-      replyToId: engMsgs[2]._id as mongoose.Types.ObjectId, // replies to "WebSocket reconnect..."
+      replyToId: engMsgs[2]._id,
     },
   ]);
 
-  // #design — 5 messages, including 1 quote reply
   const designMsgs = await sendMessages([
     { channelId: design._id, senderId: dave._id, content: 'Uploaded the new channel list mockups to Figma.' },
     { channelId: design._id, senderId: carol._id, content: 'Love the unread badge placement. Very clean.' },
@@ -111,24 +131,45 @@ async function seed() {
     { channelId: design._id, senderId: alice._id, content: 'Can we add a hover state for the reply button?' },
     { channelId: design._id, senderId: dave._id, content: 'Good call, I\'ll add that in the next iteration.' },
   ]);
-  // Quote reply in #design
   await sendMessages([
     {
       channelId: design._id,
       senderId: carol._id,
       content: 'Agreed, subtle hover feedback would be great.',
-      replyToId: designMsgs[3]._id as mongoose.Types.ObjectId, // replies to "Can we add a hover state..."
+      replyToId: designMsgs[3]._id,
     },
   ]);
 
   const totalMessages = await Message.countDocuments();
   console.log(`Seeded ${totalMessages} messages (including 2 quote replies)`);
 
-  await mongoose.disconnect();
-  console.log('Seed complete ✓');
+  return {
+    users: { alice, bob, carol, dave },
+    channels: { general, engineering, design },
+    messages: {
+      general: generalMsgs,
+      engineering: await Message.find({ channelId: engineering._id }).sort({ _id: 1 }),
+      design: await Message.find({ channelId: design._id }).sort({ _id: 1 }),
+    },
+  };
 }
 
-seed().catch((err) => {
-  console.error('Seed failed:', err);
-  process.exit(1);
-});
+export async function runSeed(uri = MONGODB_URI) {
+  await mongoose.connect(uri);
+  console.log('Connected to MongoDB');
+
+  await clearDatabase();
+  const fixtures = await seedDatabase();
+
+  await mongoose.disconnect();
+  console.log('Seed complete ✓');
+
+  return fixtures;
+}
+
+if (require.main === module) {
+  runSeed().catch((err) => {
+    console.error('Seed failed:', err);
+    process.exit(1);
+  });
+}
