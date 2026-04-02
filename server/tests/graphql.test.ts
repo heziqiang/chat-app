@@ -88,29 +88,105 @@ describe('GraphQL API', () => {
   it('returns channels with unread counts and last messages', async () => {
     const response = await graphqlRequest<{
       channels: Array<{
+        id: string;
         name: string;
+        type: string;
         unreadCount: number;
         lastMessage: { content: string } | null;
+        members: Array<{ id: string; displayName: string }>;
       }>;
     }>({
       query:
-        'query { channels { name unreadCount lastMessage { content } } }',
+        'query { channels { id name type unreadCount lastMessage { content } members { id displayName } } }',
       userId: fixtures.users.alice._id.toString(),
     });
 
     expect(response.errors).toBeUndefined();
-    expect(response.data?.channels).toHaveLength(3);
-    expect(response.data?.channels.map((channel) => channel.name)).toEqual([
-      'design',
-      'engineering',
-      'general',
-    ]);
-    expect(response.data?.channels.every((channel) => channel.unreadCount === 6)).toBe(
-      true,
+    expect(response.data?.channels).toHaveLength(4);
+
+    const generalChannel = response.data?.channels.find(
+      (channel) => channel.id === fixtures.channels.general._id.toString(),
     );
+    const engineeringChannel = response.data?.channels.find(
+      (channel) => channel.id === fixtures.channels.engineering._id.toString(),
+    );
+    const dmAliceBobChannel = response.data?.channels.find(
+      (channel) => channel.id === fixtures.channels.dmAliceBob._id.toString(),
+    );
+    const dmAliceCarolChannel = response.data?.channels.find(
+      (channel) => channel.id === fixtures.channels.dmAliceCarol._id.toString(),
+    );
+    const groupCount = response.data?.channels.filter((channel) => channel.type === 'group').length;
+    const dmCount = response.data?.channels.filter((channel) => channel.type === 'dm').length;
+
+    expect(generalChannel?.name).toBe('General');
+    expect(engineeringChannel?.name).toBe('Engineering');
+    expect(groupCount).toBe(2);
+    expect(dmCount).toBe(2);
+    expect(dmAliceBobChannel?.type).toBe('dm');
+    expect(dmAliceBobChannel?.members.map((member) => member.displayName).sort()).toEqual([
+      'Alice Chen',
+      'Bob Smith',
+    ]);
+    expect(dmAliceCarolChannel?.type).toBe('dm');
+    expect(dmAliceCarolChannel?.members.map((member) => member.displayName).sort()).toEqual([
+      'Alice Chen',
+      'Carol Wang',
+    ]);
+    expect(
+      response.data?.channels.some(
+        (channel) => channel.id === fixtures.channels.dmCarolDave._id.toString(),
+      ),
+    ).toBe(false);
+    expect(generalChannel?.unreadCount).toBe(6);
+    expect(engineeringChannel?.unreadCount).toBe(6);
+    expect(dmAliceBobChannel?.unreadCount).toBe(4);
+    expect(dmAliceCarolChannel?.unreadCount).toBe(4);
     expect(
       response.data?.channels.every((channel) => channel.lastMessage?.content),
     ).toBe(true);
+  });
+
+  it('seeds each user with more DMs than groups', async () => {
+    const responses = await Promise.all(
+      Object.values(fixtures.users).map((user) =>
+        graphqlRequest<{
+          channels: Array<{ type: string }>;
+        }>({
+          query: 'query { channels { type } }',
+          userId: user._id.toString(),
+        }),
+      ),
+    );
+
+    for (const response of responses) {
+      expect(response.errors).toBeUndefined();
+
+      const dmCount = response.data?.channels.filter((channel) => channel.type === 'dm').length ?? 0;
+      const groupCount =
+        response.data?.channels.filter((channel) => channel.type === 'group').length ?? 0;
+
+      expect(dmCount).toBeGreaterThanOrEqual(2);
+      expect(dmCount).toBeLessThanOrEqual(3);
+      expect(groupCount).toBeGreaterThanOrEqual(1);
+      expect(groupCount).toBeLessThanOrEqual(2);
+      expect(dmCount).toBeGreaterThanOrEqual(groupCount);
+    }
+  });
+
+  it('rejects message queries for channels the current user does not belong to', async () => {
+    const response = await graphqlRequest<{
+      messages: Array<{ id: string }>;
+    }>({
+      query: 'query($channelId: ID!) { messages(channelId: $channelId) { id } }',
+      variables: {
+        channelId: fixtures.channels.dmCarolDave._id.toString(),
+      },
+      userId: fixtures.users.alice._id.toString(),
+    });
+
+    expect(response.data).toBeNull();
+    expect(response.errors?.[0]?.message).toBe('Channel not found or access denied');
   });
 
   it('returns channel messages in chronological order with reply data', async () => {
@@ -122,6 +198,7 @@ describe('GraphQL API', () => {
       variables: {
         channelId: fixtures.channels.engineering._id.toString(),
       },
+      userId: fixtures.users.alice._id.toString(),
     });
 
     expect(response.errors).toBeUndefined();
@@ -157,8 +234,27 @@ describe('GraphQL API', () => {
     expect(response.data?.sendMessage).toEqual({
       content: 'backend test message',
       sender: { username: 'bob' },
-      channel: { name: 'general' },
+      channel: { name: 'General' },
     });
+  });
+
+  it('rejects sendMessage for channels the current user does not belong to', async () => {
+    const response = await graphqlRequest<{
+      sendMessage: { id: string };
+    }>({
+      query:
+        'mutation($input: SendMessageInput!) { sendMessage(input: $input) { id } }',
+      variables: {
+        input: {
+          channelId: fixtures.channels.dmCarolDave._id.toString(),
+          content: 'should fail',
+        },
+      },
+      userId: fixtures.users.alice._id.toString(),
+    });
+
+    expect(response.data).toBeNull();
+    expect(response.errors?.[0]?.message).toBe('Channel not found or access denied');
   });
 
   it('rejects sendMessage without x-user-id', async () => {

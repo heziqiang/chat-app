@@ -19,12 +19,20 @@ export interface SeedFixtures {
   channels: {
     general: ChannelDoc;
     engineering: ChannelDoc;
-    design: ChannelDoc;
+    dmAliceBob: ChannelDoc;
+    dmAliceCarol: ChannelDoc;
+    dmBobCarol: ChannelDoc;
+    dmBobDave: ChannelDoc;
+    dmCarolDave: ChannelDoc;
   };
   messages: {
     general: MessageDoc[];
     engineering: MessageDoc[];
-    design: MessageDoc[];
+    dmAliceBob: MessageDoc[];
+    dmAliceCarol: MessageDoc[];
+    dmBobCarol: MessageDoc[];
+    dmBobDave: MessageDoc[];
+    dmCarolDave: MessageDoc[];
   };
 }
 
@@ -59,45 +67,67 @@ export async function seedDatabase(): Promise<SeedFixtures> {
     {
       username: 'alice',
       displayName: 'Alice Chen',
-      avatarUrl: 'https://api.dicebear.com/9.x/avataaars/svg?seed=alice',
+      avatarUrl: 'https://i.pravatar.cc/150?img=47',
       title: 'CTO @ Gradual',
     },
     {
       username: 'bob',
       displayName: 'Bob Smith',
-      avatarUrl: 'https://api.dicebear.com/9.x/avataaars/svg?seed=bob',
+      avatarUrl: 'https://i.pravatar.cc/150?img=12',
       title: 'Senior Engineer',
     },
     {
       username: 'carol',
       displayName: 'Carol Wang',
-      avatarUrl: 'https://api.dicebear.com/9.x/avataaars/svg?seed=carol',
+      avatarUrl: 'https://i.pravatar.cc/150?img=44',
       title: 'Product Manager',
     },
     {
       username: 'dave',
       displayName: 'Dave Kim',
-      avatarUrl: 'https://api.dicebear.com/9.x/avataaars/svg?seed=dave',
+      avatarUrl: 'https://i.pravatar.cc/150?img=11',
       title: 'Designer',
     },
   ]);
   console.log(`Seeded ${4} users`);
 
-  const [general, engineering, design] = await Channel.insertMany([
+  const [general, engineering] = await Channel.insertMany([
     {
-      name: 'general',
-      avatarUrl: 'https://api.dicebear.com/9.x/identicon/svg?seed=general',
+      name: 'General',
+      type: 'group',
+      memberUserIds: [alice._id, bob._id, carol._id, dave._id],
     },
     {
-      name: 'engineering',
-      avatarUrl: 'https://api.dicebear.com/9.x/identicon/svg?seed=engineering',
-    },
-    {
-      name: 'design',
-      avatarUrl: 'https://api.dicebear.com/9.x/identicon/svg?seed=design',
+      name: 'Engineering',
+      type: 'group',
+      memberUserIds: [alice._id, bob._id, carol._id],
     },
   ]);
-  console.log(`Seeded ${3} channels`);
+
+  // DM channels — no name, type: 'dm', exactly 2 members
+  const [dmAliceBob, dmAliceCarol, dmBobCarol, dmBobDave, dmCarolDave] = await Channel.insertMany([
+    {
+      type: 'dm',
+      memberUserIds: [alice._id, bob._id],
+    },
+    {
+      type: 'dm',
+      memberUserIds: [alice._id, carol._id],
+    },
+    {
+      type: 'dm',
+      memberUserIds: [bob._id, carol._id],
+    },
+    {
+      type: 'dm',
+      memberUserIds: [bob._id, dave._id],
+    },
+    {
+      type: 'dm',
+      memberUserIds: [carol._id, dave._id],
+    },
+  ]);
+  console.log('Seeded 7 channels (2 group + 5 dm)');
 
   const generalMsgs = await sendMessages([
     { channelId: general._id, senderId: alice._id, content: 'Welcome to Gradual Chat! 🎉' },
@@ -124,20 +154,86 @@ export async function seedDatabase(): Promise<SeedFixtures> {
     },
   ]);
 
-  const designMsgs = await sendMessages([
-    { channelId: design._id, senderId: dave._id, content: 'Uploaded the new channel list mockups to Figma.' },
-    { channelId: design._id, senderId: carol._id, content: 'Love the unread badge placement. Very clean.' },
-    { channelId: design._id, senderId: dave._id, content: 'Thanks! I also updated the message bubble spacing.' },
-    { channelId: design._id, senderId: alice._id, content: 'Can we add a hover state for the reply button?' },
-    { channelId: design._id, senderId: dave._id, content: 'Good call, I\'ll add that in the next iteration.' },
+  // DM: Alice <-> Bob
+  const dmAliceBobMsgs = await sendMessages([
+    { channelId: dmAliceBob._id, senderId: alice._id, content: 'Hey Bob, got a minute to chat about the deploy?' },
+    { channelId: dmAliceBob._id, senderId: bob._id, content: 'Sure! What\'s up?' },
+    { channelId: dmAliceBob._id, senderId: alice._id, content: 'Can you walk me through the rollback plan?' },
+    { channelId: dmAliceBob._id, senderId: bob._id, content: 'Yeah, I documented it in the runbook. Let me send you the link.' },
   ]);
-  await sendMessages([
+
+  // DM: Alice <-> Carol
+  const dmAliceCarolMsgs = await sendMessages([
     {
-      channelId: design._id,
-      senderId: carol._id,
-      content: 'Agreed, subtle hover feedback would be great.',
-      replyToId: designMsgs[3]._id,
+      channelId: dmAliceCarol._id,
+      senderId: alice._id,
+      content: 'Want to tighten the agenda before tomorrow\'s product sync?',
     },
+    {
+      channelId: dmAliceCarol._id,
+      senderId: carol._id,
+      content: 'Yes. I can shorten the roadmap section and keep only decisions.',
+    },
+    {
+      channelId: dmAliceCarol._id,
+      senderId: alice._id,
+      content: 'Perfect, let\'s spend most of the time on blockers and owners.',
+    },
+    {
+      channelId: dmAliceCarol._id,
+      senderId: carol._id,
+      content: 'Sounds good. I\'ll update the doc before lunch.',
+    },
+  ]);
+
+  // DM: Bob <-> Carol
+  const dmBobCarolMsgs = await sendMessages([
+    {
+      channelId: dmBobCarol._id,
+      senderId: bob._id,
+      content: 'Pagination API is ready for QA.',
+    },
+    {
+      channelId: dmBobCarol._id,
+      senderId: carol._id,
+      content: 'Nice. Any edge cases product should call out?',
+    },
+    {
+      channelId: dmBobCarol._id,
+      senderId: bob._id,
+      content: 'Only stale cursors. I added a guard and a clearer error message.',
+    },
+    {
+      channelId: dmBobCarol._id,
+      senderId: carol._id,
+      content: 'Great, I\'ll add that note to the release checklist.',
+    },
+  ]);
+
+  // DM: Bob <-> Dave
+  const dmBobDaveMsgs = await sendMessages([
+    {
+      channelId: dmBobDave._id,
+      senderId: dave._id,
+      content: 'Can you send me a staging build with the updated sidebar spacing?',
+    },
+    {
+      channelId: dmBobDave._id,
+      senderId: bob._id,
+      content: 'Just deployed one. A hard refresh should pick it up.',
+    },
+    {
+      channelId: dmBobDave._id,
+      senderId: dave._id,
+      content: 'Seeing it now. The channel rows feel much cleaner.',
+    },
+  ]);
+
+  // DM: Carol <-> Dave
+  const dmCarolDaveMsgs = await sendMessages([
+    { channelId: dmCarolDave._id, senderId: carol._id, content: 'Dave, the new mockups look amazing!' },
+    { channelId: dmCarolDave._id, senderId: dave._id, content: 'Thanks Carol! Any feedback on the color palette?' },
+    { channelId: dmCarolDave._id, senderId: carol._id, content: 'Maybe slightly warmer tones for the sidebar? Otherwise perfect.' },
   ]);
 
   const totalMessages = await Message.countDocuments();
@@ -145,11 +241,23 @@ export async function seedDatabase(): Promise<SeedFixtures> {
 
   return {
     users: { alice, bob, carol, dave },
-    channels: { general, engineering, design },
+    channels: {
+      general,
+      engineering,
+      dmAliceBob,
+      dmAliceCarol,
+      dmBobCarol,
+      dmBobDave,
+      dmCarolDave,
+    },
     messages: {
       general: generalMsgs,
       engineering: await Message.find({ channelId: engineering._id }).sort({ _id: 1 }),
-      design: await Message.find({ channelId: design._id }).sort({ _id: 1 }),
+      dmAliceBob: dmAliceBobMsgs,
+      dmAliceCarol: dmAliceCarolMsgs,
+      dmBobCarol: dmBobCarolMsgs,
+      dmBobDave: dmBobDaveMsgs,
+      dmCarolDave: dmCarolDaveMsgs,
     },
   };
 }

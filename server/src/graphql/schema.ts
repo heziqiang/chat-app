@@ -10,7 +10,9 @@ const typeDefs = `#graphql
   type Channel {
     id: ID!
     name: String!
+    type: String!
     avatarUrl: String
+    members: [User!]!
     lastMessage: Message
     unreadCount: Int!
   }

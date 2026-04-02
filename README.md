@@ -2,28 +2,6 @@
 
 A channel-based messaging app with real-time sync, built with React, GraphQL, and Socket.io.
 
-## Quick Start
-
-1. Install dependencies:
-
-```bash
-npm install && npm run install:all
-```
-
-2. Start MongoDB:
-
-```bash
-docker compose up -d
-```
-
-3. Seed data and start dev servers:
-
-```bash
-npm run seed && npm run dev
-```
-
-App runs at `http://localhost:5173`.
-
 ## Tech Stack
 
 - Frontend: React + TypeScript + Vite + Apollo Client
@@ -32,9 +10,57 @@ App runs at `http://localhost:5173`.
 
 ## Project Structure
 
-- `client/` — Frontend application
-- `server/` — Backend service
-- `docs/` — Technical design documents
+- `client/` — React frontend
+- `server/` — GraphQL API, seed script, backend tests
+- `docs/` — external technical design
+
+## Local Development
+
+Prerequisite: MongoDB running at `mongodb://localhost:27017/gradual-chat`.
+
+Install dependencies:
+
+```bash
+npm install
+npm run install:all
+```
+
+Seed data:
+
+```bash
+npm run seed
+```
+
+Start backend and frontend in separate terminals:
+
+```bash
+cd server && npm run dev
+```
+
+```bash
+cd client && npm run dev
+```
+
+- Frontend: `http://localhost:5173`
+- Backend: `http://localhost:4000`
+
+## Testing
+
+Backend tests:
+
+```bash
+cd server && npm test
+```
+
+## Docker
+
+Current [docker-compose.yml](/Users/heziqiang/code/gradual-chat-app/docker-compose.yml) only starts MongoDB:
+
+```bash
+docker compose up -d mongodb
+```
+
+It does not yet run the frontend and backend containers.
 
 ## Docs
 

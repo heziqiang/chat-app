@@ -2,13 +2,17 @@ import { Types } from 'mongoose';
 import { Message, Channel, User, ReadStatus } from '../../models';
 import type { IMessage } from '../../models';
 import type { GqlContext } from '../index';
+import { requireChannelAccess, requireUserId } from './channel';
 
 export const messageResolvers = {
   Query: {
     messages: async (
       _: unknown,
       args: { channelId: string; limit?: number; before?: string },
+      context: GqlContext,
     ) => {
+      await requireChannelAccess(args.channelId, context);
+
       const { channelId, limit = 30, before } = args;
       const filter: Record<string, unknown> = {
         channelId: new Types.ObjectId(channelId),
@@ -38,19 +42,14 @@ export const messageResolvers = {
       context: GqlContext,
     ) => {
       const { channelId, content, replyTo, mentions } = args.input;
-      if (!context.userId) {
-        throw new Error('x-user-id header is required');
-      }
+      const userId = requireUserId(context);
       if (!content.trim()) {
         throw new Error('Message content cannot be empty');
       }
-      const channel = await Channel.findById(channelId);
-      if (!channel) {
-        throw new Error(`Channel ${channelId} not found`);
-      }
+      await requireChannelAccess(channelId, context);
       const message = await Message.create({
         channelId: new Types.ObjectId(channelId),
-        senderId: new Types.ObjectId(context.userId),
+        senderId: new Types.ObjectId(userId),
         content,
         replyToId: replyTo ? new Types.ObjectId(replyTo) : null,
         mentionUserIds: mentions?.map((id) => new Types.ObjectId(id)) ?? [],
@@ -63,12 +62,12 @@ export const messageResolvers = {
       args: { channelId: string; messageId: string },
       context: GqlContext,
     ) => {
-      if (!context.userId) {
-        throw new Error('x-user-id header is required');
-      }
+      const userId = requireUserId(context);
+      await requireChannelAccess(args.channelId, context);
+
       await ReadStatus.findOneAndUpdate(
         {
-          userId: new Types.ObjectId(context.userId),
+          userId: new Types.ObjectId(userId),
           channelId: new Types.ObjectId(args.channelId),
         },
         { lastReadMessageId: new Types.ObjectId(args.messageId) },
