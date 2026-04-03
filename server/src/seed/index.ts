@@ -1,40 +1,221 @@
-import mongoose, { type HydratedDocument } from 'mongoose';
+import mongoose from 'mongoose';
 import { User, Channel, Message, ReadStatus } from '../models';
-import type { IUser, IChannel, IMessage } from '../models';
 
 const MONGODB_URI =
   process.env.MONGODB_URI || 'mongodb://localhost:27017/gradual-chat';
 
-type UserDoc = HydratedDocument<IUser>;
-type ChannelDoc = HydratedDocument<IChannel>;
-type MessageDoc = HydratedDocument<IMessage>;
+const GROUP_MESSAGE_COUNTS = {
+  shareYourStory: 24,
+  productTeam: 72,
+} as const;
 
-export interface SeedFixtures {
-  users: {
-    alice: UserDoc;
-    bob: UserDoc;
-    carol: UserDoc;
-    dave: UserDoc;
+const DM_MESSAGE_COUNTS = {
+  dmAliceBob: 4,
+  dmAliceCarol: 4,
+  dmBobCarol: 5,
+  dmBobDave: 3,
+  dmCarolDave: 4,
+} as const;
+
+const STORY_PARTS = {
+  starts: [
+    'I moved into tech from support',
+    'My first startup job was on a tiny team',
+    'A side project is what got me into product',
+    'Switching out of agency work changed everything for me',
+    'The biggest turning point in my career was a messy launch',
+  ],
+  middles: [
+    'and it taught me to stay close to customer pain',
+    'so now I ask more questions before proposing changes',
+    'and it made quick feedback feel normal',
+    'which is why I care a lot about simple workflows',
+    'and it forced me to get comfortable with ambiguity',
+  ],
+  ends: [
+    'That habit still helps every week.',
+    'I still fall back to that when a project gets noisy.',
+    'It changed how I work with engineers.',
+    'That is probably why I prefer small iterations.',
+    'It made collaboration much easier for me.',
+  ],
+} as const;
+
+const PRODUCT_PARTS = {
+  starts: [
+    'The new onboarding flow',
+    'The setup checklist',
+    'The welcome screen copy',
+    'The progress indicator',
+    'The empty state in setup',
+    'The activation email',
+  ],
+  middles: [
+    'feels clearer after the last round',
+    'still needs one more pass',
+    'looks better with the shorter copy',
+    'is much easier to scan now',
+    'still feels a bit heavy on mobile',
+    'is close but not fully there yet',
+  ],
+  ends: [
+    'I think new users will notice the difference.',
+    'We should keep the next change small.',
+    'QA can probably verify this quickly.',
+    'The current draft is good enough for another round.',
+    'I would rather ship this than reopen the whole flow.',
+    'The handoff to engineering looks straightforward.',
+  ],
+} as const;
+
+const DM_TOPICS = [
+  'the message list spacing',
+  'the empty state copy',
+  'the avatar crop',
+  'the channel header',
+  'the composer padding',
+  'the onboarding draft',
+  'the group intro text',
+] as const;
+
+const DM_OPENERS = [
+  'Do you have a minute to check',
+  'Can you take a quick look at',
+  'Are you around to review',
+  'Mind taking a pass at',
+  'Could you glance at',
+  'Can you sanity-check',
+] as const;
+
+const DM_RESPONSES = [
+  'Sure, I am looking now',
+  'Yep, opening it now',
+  'I can check it now',
+  'Yes, give me a minute',
+  'On it',
+  'I am in the file already',
+] as const;
+
+const DM_NOTES = [
+  'The latest version feels better already',
+  'I only changed a couple of small things',
+  'The mobile view is the part I am unsure about',
+  'It is mostly fine, just a little tight on smaller screens',
+  'I think we are close',
+  'The main structure feels right now',
+ ] as const;
+
+const DM_CLOSERS = [
+  'Looks good to me',
+  'I would ship this version',
+  'Let me make one tiny adjustment and send it back',
+  'The latest version works for me',
+  'This feels ready enough for now',
+  'I think this is in a good place',
+] as const;
+
+const DM_SIGN_OFFS = [
+  'Nice, thanks',
+  'Perfect, appreciate it',
+  'Great, that helps',
+  'Sounds good',
+  'Awesome, thank you',
+  'That is enough for me',
+] as const;
+
+type MessageSeed = {
+  _id: mongoose.Types.ObjectId;
+  channelId: mongoose.Types.ObjectId;
+  senderId: mongoose.Types.ObjectId;
+  content: string;
+  replyToId: mongoose.Types.ObjectId | null;
+  mentionUserIds: mongoose.Types.ObjectId[];
+};
+
+type Participant = {
+  _id: mongoose.Types.ObjectId;
+};
+
+const pickRandom = <T>(items: readonly T[]) =>
+  items[Math.floor(Math.random() * items.length)];
+
+const createMessageSeed = (input: {
+  channelId: mongoose.Types.ObjectId;
+  senderId: mongoose.Types.ObjectId;
+  content: string;
+  replyToId?: mongoose.Types.ObjectId | null;
+}): MessageSeed => ({
+  _id: new mongoose.Types.ObjectId(),
+  channelId: input.channelId,
+  senderId: input.senderId,
+  content: input.content,
+  replyToId: input.replyToId ?? null,
+  mentionUserIds: [],
+});
+
+const buildTopicMessage = (parts: {
+  starts: readonly string[];
+  middles: readonly string[];
+  ends: readonly string[];
+}) => `${pickRandom(parts.starts)} ${pickRandom(parts.middles)}. ${pickRandom(parts.ends)}`;
+
+const buildGroupMessages = (options: {
+  channelId: mongoose.Types.ObjectId;
+  participants: Participant[];
+  count: number;
+  parts: {
+    starts: readonly string[];
+    middles: readonly string[];
+    ends: readonly string[];
   };
-  channels: {
-    general: ChannelDoc;
-    engineering: ChannelDoc;
-    dmAliceBob: ChannelDoc;
-    dmAliceCarol: ChannelDoc;
-    dmBobCarol: ChannelDoc;
-    dmBobDave: ChannelDoc;
-    dmCarolDave: ChannelDoc;
-  };
-  messages: {
-    general: MessageDoc[];
-    engineering: MessageDoc[];
-    dmAliceBob: MessageDoc[];
-    dmAliceCarol: MessageDoc[];
-    dmBobCarol: MessageDoc[];
-    dmBobDave: MessageDoc[];
-    dmCarolDave: MessageDoc[];
-  };
-}
+  includeReply?: boolean;
+}) => {
+  const baseCount = options.includeReply ? options.count - 1 : options.count;
+  const messages = Array.from({ length: baseCount }, () =>
+    createMessageSeed({
+      channelId: options.channelId,
+      senderId: pickRandom(options.participants)._id,
+      content: buildTopicMessage(options.parts),
+    }),
+  );
+
+  if (options.includeReply && messages.length > 0) {
+    const replyTarget = messages[Math.floor(messages.length / 2)];
+    messages.push(
+      createMessageSeed({
+        channelId: options.channelId,
+        senderId: pickRandom(options.participants)._id,
+        content: `I agree, especially around ${pickRandom(options.parts.starts).toLowerCase()}.`,
+        replyToId: replyTarget._id,
+      }),
+    );
+  }
+
+  return messages;
+};
+
+const buildDmMessages = (options: {
+  channelId: mongoose.Types.ObjectId;
+  participants: [Participant, Participant];
+  count: number;
+}) => {
+  const topic = pickRandom(DM_TOPICS);
+  const lines = [
+    `${pickRandom(DM_OPENERS)} ${topic}?`,
+    `${pickRandom(DM_RESPONSES)}.`,
+    `${pickRandom(DM_NOTES)}.`,
+    `${pickRandom(DM_CLOSERS)}.`,
+    `${pickRandom(DM_SIGN_OFFS)}.`,
+  ];
+
+  return Array.from({ length: options.count }, (_, index) =>
+    createMessageSeed({
+      channelId: options.channelId,
+      senderId: options.participants[index % options.participants.length]._id,
+      content: lines[index] ?? `${pickRandom(DM_SIGN_OFFS)}.`,
+    }),
+  );
+};
 
 export async function clearDatabase() {
   await Promise.all([
@@ -46,204 +227,98 @@ export async function clearDatabase() {
   console.log('Cleared existing data');
 }
 
-export async function seedDatabase(): Promise<SeedFixtures> {
-  const sendMessages = async (
-    items: {
-      channelId: mongoose.Types.ObjectId;
-      senderId: mongoose.Types.ObjectId;
-      content: string;
-      replyToId?: mongoose.Types.ObjectId;
-    }[],
-  ): Promise<MessageDoc[]> => {
-    const created: MessageDoc[] = [];
-    for (const item of items) {
-      const msg = await Message.create(item);
-      created.push(msg);
-    }
-    return created;
-  };
-
+export async function seedDatabase() {
   const [alice, bob, carol, dave] = await User.insertMany([
-    {
-      username: 'alice',
-      displayName: 'Alice Chen',
-      avatarUrl: 'https://i.pravatar.cc/150?img=47',
-      title: 'CTO',
-    },
-    {
-      username: 'bob',
-      displayName: 'Bob Smith',
-      avatarUrl: 'https://i.pravatar.cc/150?img=12',
-      title: 'Senior Engineer',
-    },
-    {
-      username: 'carol',
-      displayName: 'Carol Wang',
-      avatarUrl: 'https://i.pravatar.cc/150?img=44',
-      title: 'Product Manager',
-    },
-    {
-      username: 'dave',
-      displayName: 'Dave Kim',
-      avatarUrl: 'https://i.pravatar.cc/150?img=11',
-      title: 'Designer',
-    },
+    { username: 'alice', displayName: 'Alice Chen', avatarUrl: 'https://i.pravatar.cc/150?img=47', title: 'CTO' },
+    { username: 'bob', displayName: 'Bob Smith', avatarUrl: 'https://i.pravatar.cc/150?img=12', title: 'Senior Engineer' },
+    { username: 'carol', displayName: 'Carol Wang', avatarUrl: 'https://i.pravatar.cc/150?img=44', title: 'Product Manager' },
+    { username: 'dave', displayName: 'Dave Kim', avatarUrl: 'https://i.pravatar.cc/150?img=11', title: 'Designer' },
   ]);
-  console.log(`Seeded ${4} users`);
+  console.log('Seeded 4 users');
 
-  const [general, engineering] = await Channel.insertMany([
-    {
-      name: 'General',
-      type: 'group',
-      memberUserIds: [alice._id, bob._id, carol._id, dave._id],
-    },
-    {
-      name: 'Engineering',
-      type: 'group',
-      memberUserIds: [alice._id, bob._id, carol._id],
-    },
+  const [shareYourStory, productTeam] = await Channel.insertMany([
+    { name: 'Share your story', type: 'group', memberUserIds: [alice._id, bob._id, carol._id, dave._id] },
+    { name: 'Product team', type: 'group', memberUserIds: [alice._id, bob._id, carol._id, dave._id] },
   ]);
 
-  // DM channels — no name, type: 'dm', exactly 2 members
   const [dmAliceBob, dmAliceCarol, dmBobCarol, dmBobDave, dmCarolDave] = await Channel.insertMany([
-    {
-      type: 'dm',
-      memberUserIds: [alice._id, bob._id],
-    },
-    {
-      type: 'dm',
-      memberUserIds: [alice._id, carol._id],
-    },
-    {
-      type: 'dm',
-      memberUserIds: [bob._id, carol._id],
-    },
-    {
-      type: 'dm',
-      memberUserIds: [bob._id, dave._id],
-    },
-    {
-      type: 'dm',
-      memberUserIds: [carol._id, dave._id],
-    },
+    { type: 'dm', memberUserIds: [alice._id, bob._id] },
+    { type: 'dm', memberUserIds: [alice._id, carol._id] },
+    { type: 'dm', memberUserIds: [bob._id, carol._id] },
+    { type: 'dm', memberUserIds: [bob._id, dave._id] },
+    { type: 'dm', memberUserIds: [carol._id, dave._id] },
   ]);
   console.log('Seeded 7 channels (2 group + 5 dm)');
 
-  const generalMsgs = await sendMessages([
-    { channelId: general._id, senderId: alice._id, content: 'Welcome to Gradual Chat! 🎉' },
-    { channelId: general._id, senderId: bob._id, content: 'Hey everyone, excited to be here.' },
-    { channelId: general._id, senderId: carol._id, content: 'Quick reminder: product sync is at 3pm today.' },
-    { channelId: general._id, senderId: dave._id, content: 'Thanks Carol, I\'ll have the mockups ready by then.' },
-    { channelId: general._id, senderId: alice._id, content: 'Great, looking forward to seeing the new designs.' },
-    { channelId: general._id, senderId: bob._id, content: 'I pushed the API changes this morning, feel free to test.' },
-  ]);
+  const users = { alice, bob, carol, dave };
 
-  const engMsgs = await sendMessages([
-    { channelId: engineering._id, senderId: bob._id, content: 'Deployed v2.1 to staging. Please smoke test when you get a chance.' },
-    { channelId: engineering._id, senderId: alice._id, content: 'On it. Any known issues?' },
-    { channelId: engineering._id, senderId: bob._id, content: 'WebSocket reconnect has a small race condition, working on a fix.' },
-    { channelId: engineering._id, senderId: carol._id, content: 'Is the pagination endpoint stable? Frontend team wants to integrate.' },
-    { channelId: engineering._id, senderId: bob._id, content: 'Yes, cursor-based pagination is solid. Go ahead and integrate.' },
-  ]);
-  await sendMessages([
-    {
-      channelId: engineering._id,
-      senderId: alice._id,
-      content: 'Nice, I confirmed the fix on staging. Looks good to ship.',
-      replyToId: engMsgs[2]._id,
-    },
-  ]);
+  const shareYourStoryMessages = await Message.insertMany(
+    buildGroupMessages({
+      channelId: shareYourStory._id,
+      participants: [alice, bob, carol, dave],
+      count: GROUP_MESSAGE_COUNTS.shareYourStory,
+      parts: STORY_PARTS,
+    }),
+  );
 
-  // DM: Alice <-> Bob
-  const dmAliceBobMsgs = await sendMessages([
-    { channelId: dmAliceBob._id, senderId: alice._id, content: 'Hey Bob, got a minute to chat about the deploy?' },
-    { channelId: dmAliceBob._id, senderId: bob._id, content: 'Sure! What\'s up?' },
-    { channelId: dmAliceBob._id, senderId: alice._id, content: 'Can you walk me through the rollback plan?' },
-    { channelId: dmAliceBob._id, senderId: bob._id, content: 'Yeah, I documented it in the runbook. Let me send you the link.' },
-  ]);
+  const productTeamMessages = await Message.insertMany(
+    buildGroupMessages({
+      channelId: productTeam._id,
+      participants: [alice, bob, carol, dave],
+      count: GROUP_MESSAGE_COUNTS.productTeam,
+      parts: PRODUCT_PARTS,
+      includeReply: true,
+    }),
+  );
 
-  // DM: Alice <-> Carol
-  const dmAliceCarolMsgs = await sendMessages([
-    {
+  const dmAliceBobMessages = await Message.insertMany(
+    buildDmMessages({
+      channelId: dmAliceBob._id,
+      participants: [users.alice, users.bob],
+      count: DM_MESSAGE_COUNTS.dmAliceBob,
+    }),
+  );
+
+  const dmAliceCarolMessages = await Message.insertMany(
+    buildDmMessages({
       channelId: dmAliceCarol._id,
-      senderId: alice._id,
-      content: 'Want to tighten the agenda before tomorrow\'s product sync?',
-    },
-    {
-      channelId: dmAliceCarol._id,
-      senderId: carol._id,
-      content: 'Yes. I can shorten the roadmap section and keep only decisions.',
-    },
-    {
-      channelId: dmAliceCarol._id,
-      senderId: alice._id,
-      content: 'Perfect, let\'s spend most of the time on blockers and owners.',
-    },
-    {
-      channelId: dmAliceCarol._id,
-      senderId: carol._id,
-      content: 'Sounds good. I\'ll update the doc before lunch.',
-    },
-  ]);
+      participants: [users.alice, users.carol],
+      count: DM_MESSAGE_COUNTS.dmAliceCarol,
+    }),
+  );
 
-  // DM: Bob <-> Carol
-  const dmBobCarolMsgs = await sendMessages([
-    {
+  const dmBobCarolMessages = await Message.insertMany(
+    buildDmMessages({
       channelId: dmBobCarol._id,
-      senderId: bob._id,
-      content: 'Pagination API is ready for QA.',
-    },
-    {
-      channelId: dmBobCarol._id,
-      senderId: carol._id,
-      content: 'Nice. Any edge cases product should call out?',
-    },
-    {
-      channelId: dmBobCarol._id,
-      senderId: bob._id,
-      content: 'Only stale cursors. I added a guard and a clearer error message.',
-    },
-    {
-      channelId: dmBobCarol._id,
-      senderId: carol._id,
-      content: 'Great, I\'ll add that note to the release checklist.',
-    },
-  ]);
+      participants: [users.bob, users.carol],
+      count: DM_MESSAGE_COUNTS.dmBobCarol,
+    }),
+  );
 
-  // DM: Bob <-> Dave
-  const dmBobDaveMsgs = await sendMessages([
-    {
+  const dmBobDaveMessages = await Message.insertMany(
+    buildDmMessages({
       channelId: dmBobDave._id,
-      senderId: dave._id,
-      content: 'Can you send me a staging build with the updated sidebar spacing?',
-    },
-    {
-      channelId: dmBobDave._id,
-      senderId: bob._id,
-      content: 'Just deployed one. A hard refresh should pick it up.',
-    },
-    {
-      channelId: dmBobDave._id,
-      senderId: dave._id,
-      content: 'Seeing it now. The channel rows feel much cleaner.',
-    },
-  ]);
+      participants: [users.bob, users.dave],
+      count: DM_MESSAGE_COUNTS.dmBobDave,
+    }),
+  );
 
-  // DM: Carol <-> Dave
-  const dmCarolDaveMsgs = await sendMessages([
-    { channelId: dmCarolDave._id, senderId: carol._id, content: 'Dave, the new mockups look amazing!' },
-    { channelId: dmCarolDave._id, senderId: dave._id, content: 'Thanks Carol! Any feedback on the color palette?' },
-    { channelId: dmCarolDave._id, senderId: carol._id, content: 'Maybe slightly warmer tones for the sidebar? Otherwise perfect.' },
-  ]);
+  const dmCarolDaveMessages = await Message.insertMany(
+    buildDmMessages({
+      channelId: dmCarolDave._id,
+      participants: [users.carol, users.dave],
+      count: DM_MESSAGE_COUNTS.dmCarolDave,
+    }),
+  );
 
   const totalMessages = await Message.countDocuments();
-  console.log(`Seeded ${totalMessages} messages (including 2 quote replies)`);
+  console.log(`Seeded ${totalMessages} messages`);
 
   return {
-    users: { alice, bob, carol, dave },
+    users,
     channels: {
-      general,
-      engineering,
+      shareYourStory,
+      productTeam,
       dmAliceBob,
       dmAliceCarol,
       dmBobCarol,
@@ -251,13 +326,13 @@ export async function seedDatabase(): Promise<SeedFixtures> {
       dmCarolDave,
     },
     messages: {
-      general: generalMsgs,
-      engineering: await Message.find({ channelId: engineering._id }).sort({ _id: 1 }),
-      dmAliceBob: dmAliceBobMsgs,
-      dmAliceCarol: dmAliceCarolMsgs,
-      dmBobCarol: dmBobCarolMsgs,
-      dmBobDave: dmBobDaveMsgs,
-      dmCarolDave: dmCarolDaveMsgs,
+      shareYourStory: shareYourStoryMessages,
+      productTeam: productTeamMessages,
+      dmAliceBob: dmAliceBobMessages,
+      dmAliceCarol: dmAliceCarolMessages,
+      dmBobCarol: dmBobCarolMessages,
+      dmBobDave: dmBobDaveMessages,
+      dmCarolDave: dmCarolDaveMessages,
     },
   };
 }
@@ -270,7 +345,7 @@ export async function runSeed(uri = MONGODB_URI) {
   const fixtures = await seedDatabase();
 
   await mongoose.disconnect();
-  console.log('Seed complete ✓');
+  console.log('Seed complete');
 
   return fixtures;
 }

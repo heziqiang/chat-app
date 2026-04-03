@@ -2,18 +2,14 @@ import mongoose from 'mongoose';
 import request, { type SuperTest, type Test } from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp, connectToDatabase, syncModelIndexes } from '../src/index';
-import {
-  clearDatabase,
-  seedDatabase,
-  type SeedFixtures,
-} from '../src/seed';
+import { clearDatabase, seedDatabase } from '../src/seed';
 
 const TEST_MONGODB_URI =
   process.env.TEST_MONGODB_URI || 'mongodb://127.0.0.1:27017/gradual-chat-test';
 
 describe('GraphQL API', () => {
   let api: SuperTest<Test>;
-  let fixtures: SeedFixtures;
+  let fixtures: Awaited<ReturnType<typeof seedDatabase>>;
   let stopApollo: (() => Promise<void>) | null = null;
 
   beforeAll(async () => {
@@ -104,11 +100,11 @@ describe('GraphQL API', () => {
     expect(response.errors).toBeUndefined();
     expect(response.data?.channels).toHaveLength(4);
 
-    const generalChannel = response.data?.channels.find(
-      (channel) => channel.id === fixtures.channels.general._id.toString(),
+    const shareYourStoryChannel = response.data?.channels.find(
+      (channel) => channel.id === fixtures.channels.shareYourStory._id.toString(),
     );
-    const engineeringChannel = response.data?.channels.find(
-      (channel) => channel.id === fixtures.channels.engineering._id.toString(),
+    const productTeamChannel = response.data?.channels.find(
+      (channel) => channel.id === fixtures.channels.productTeam._id.toString(),
     );
     const dmAliceBobChannel = response.data?.channels.find(
       (channel) => channel.id === fixtures.channels.dmAliceBob._id.toString(),
@@ -119,8 +115,8 @@ describe('GraphQL API', () => {
     const groupCount = response.data?.channels.filter((channel) => channel.type === 'group').length;
     const dmCount = response.data?.channels.filter((channel) => channel.type === 'dm').length;
 
-    expect(generalChannel?.name).toBe('General');
-    expect(engineeringChannel?.name).toBe('Engineering');
+    expect(shareYourStoryChannel?.name).toBe('Share your story');
+    expect(productTeamChannel?.name).toBe('Product team');
     expect(groupCount).toBe(2);
     expect(dmCount).toBe(2);
     expect(dmAliceBobChannel?.type).toBe('dm');
@@ -138,16 +134,16 @@ describe('GraphQL API', () => {
         (channel) => channel.id === fixtures.channels.dmCarolDave._id.toString(),
       ),
     ).toBe(false);
-    expect(generalChannel?.unreadCount).toBe(6);
-    expect(engineeringChannel?.unreadCount).toBe(6);
-    expect(dmAliceBobChannel?.unreadCount).toBe(4);
-    expect(dmAliceCarolChannel?.unreadCount).toBe(4);
+    expect(shareYourStoryChannel?.unreadCount).toBe(fixtures.messages.shareYourStory.length);
+    expect(productTeamChannel?.unreadCount).toBe(fixtures.messages.productTeam.length);
+    expect(dmAliceBobChannel?.unreadCount).toBe(fixtures.messages.dmAliceBob.length);
+    expect(dmAliceCarolChannel?.unreadCount).toBe(fixtures.messages.dmAliceCarol.length);
     expect(
       response.data?.channels.every((channel) => channel.lastMessage?.content),
     ).toBe(true);
   });
 
-  it('seeds each user with more DMs than groups', async () => {
+  it('seeds each user with at least as many DMs as groups', async () => {
     const responses = await Promise.all(
       Object.values(fixtures.users).map((user) =>
         graphqlRequest<{
@@ -191,24 +187,29 @@ describe('GraphQL API', () => {
 
   it('returns channel messages in chronological order with reply data', async () => {
     const response = await graphqlRequest<{
-      messages: Array<{ content: string; replyTo: { content: string } | null }>;
+      messages: Array<{ id: string; replyTo: { id: string } | null }>;
     }>({
       query:
-        'query($channelId: ID!) { messages(channelId: $channelId) { content replyTo { content } } }',
+        'query($channelId: ID!, $limit: Int) { messages(channelId: $channelId, limit: $limit) { id replyTo { id } } }',
       variables: {
-        channelId: fixtures.channels.engineering._id.toString(),
+        channelId: fixtures.channels.productTeam._id.toString(),
+        limit: fixtures.messages.productTeam.length,
       },
       userId: fixtures.users.alice._id.toString(),
     });
 
     expect(response.errors).toBeUndefined();
-    expect(response.data?.messages).toHaveLength(6);
-    expect(response.data?.messages[0]?.content).toBe(
-      'Deployed v2.1 to staging. Please smoke test when you get a chance.',
+    expect(response.data?.messages).toHaveLength(fixtures.messages.productTeam.length);
+    expect(response.data?.messages.map((message) => message.id)).toEqual(
+      fixtures.messages.productTeam.map((message) => message._id.toString()),
     );
-    expect(response.data?.messages[5]?.replyTo?.content).toBe(
-      'WebSocket reconnect has a small race condition, working on a fix.',
+
+    const expectedReplyMessage = fixtures.messages.productTeam.find((message) => message.replyToId);
+    const actualReplyMessage = response.data?.messages.find(
+      (message) => message.id === expectedReplyMessage?._id.toString(),
     );
+
+    expect(actualReplyMessage?.replyTo?.id).toBe(expectedReplyMessage?.replyToId?.toString());
   });
 
   it('creates a message for the current user', async () => {
@@ -223,7 +224,7 @@ describe('GraphQL API', () => {
         'mutation($input: SendMessageInput!) { sendMessage(input: $input) { content sender { username } channel { name } } }',
       variables: {
         input: {
-          channelId: fixtures.channels.general._id.toString(),
+          channelId: fixtures.channels.shareYourStory._id.toString(),
           content: 'backend test message',
         },
       },
@@ -234,7 +235,7 @@ describe('GraphQL API', () => {
     expect(response.data?.sendMessage).toEqual({
       content: 'backend test message',
       sender: { username: 'bob' },
-      channel: { name: 'General' },
+      channel: { name: 'Share your story' },
     });
   });
 
@@ -263,7 +264,7 @@ describe('GraphQL API', () => {
         'mutation($input: SendMessageInput!) { sendMessage(input: $input) { id } }',
       variables: {
         input: {
-          channelId: fixtures.channels.general._id.toString(),
+          channelId: fixtures.channels.shareYourStory._id.toString(),
           content: 'should fail',
         },
       },
@@ -275,9 +276,9 @@ describe('GraphQL API', () => {
 
   it('updates unread count after markAsRead', async () => {
     const userId = fixtures.users.alice._id.toString();
-    const channelId = fixtures.channels.general._id.toString();
-    const latestGeneralMessageId =
-      fixtures.messages.general[fixtures.messages.general.length - 1]._id.toString();
+    const channelId = fixtures.channels.shareYourStory._id.toString();
+    const latestChannelMessageId =
+      fixtures.messages.shareYourStory[fixtures.messages.shareYourStory.length - 1]._id.toString();
 
     const beforeResponse = await graphqlRequest<{
       channels: Array<{ id: string; unreadCount: number }>;
@@ -289,7 +290,7 @@ describe('GraphQL API', () => {
     const beforeChannel = beforeResponse.data?.channels.find(
       (channel) => channel.id === channelId,
     );
-    expect(beforeChannel?.unreadCount).toBe(6);
+    expect(beforeChannel?.unreadCount).toBe(fixtures.messages.shareYourStory.length);
 
     const mutationResponse = await graphqlRequest<{
       markAsRead: boolean;
@@ -298,7 +299,7 @@ describe('GraphQL API', () => {
         'mutation($channelId: ID!, $messageId: ID!) { markAsRead(channelId: $channelId, messageId: $messageId) }',
       variables: {
         channelId,
-        messageId: latestGeneralMessageId,
+        messageId: latestChannelMessageId,
       },
       userId,
     });
