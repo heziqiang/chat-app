@@ -52,6 +52,12 @@ Backend tests:
 cd server && npm test
 ```
 
+Frontend tests:
+
+```bash
+cd client && npm test
+```
+
 ## Docker
 
 Current [docker-compose.yml](/Users/heziqiang/code/gradual-chat-app/docker-compose.yml) only starts MongoDB:
