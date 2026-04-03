@@ -68,7 +68,7 @@ export async function seedDatabase(): Promise<SeedFixtures> {
       username: 'alice',
       displayName: 'Alice Chen',
       avatarUrl: 'https://i.pravatar.cc/150?img=47',
-      title: 'CTO @ Gradual',
+      title: 'CTO',
     },
     {
       username: 'bob',

@@ -54,6 +54,45 @@ export const messageResolvers = {
         replyToId: replyTo ? new Types.ObjectId(replyTo) : null,
         mentionUserIds: mentions?.map((id) => new Types.ObjectId(id)) ?? [],
       });
+
+      // Broadcast to other users in the channel
+      if (context.io) {
+        const sender = await User.findById(message.senderId);
+        let replyToData = null;
+        if (message.replyToId) {
+          const replyMsg = await Message.findById(message.replyToId);
+          if (replyMsg) {
+            const replySender = await User.findById(replyMsg.senderId);
+            replyToData = {
+              id: replyMsg._id.toString(),
+              content: replyMsg.content,
+              sender: replySender
+                ? { id: replySender._id.toString(), displayName: replySender.displayName }
+                : null,
+            };
+          }
+        }
+
+        const payload = {
+          id: message._id.toString(),
+          content: message.content,
+          createdAt: message.createdAt.toISOString(),
+          sender: sender
+            ? {
+                id: sender._id.toString(),
+                username: sender.username,
+                displayName: sender.displayName,
+                avatarUrl: sender.avatarUrl,
+              }
+            : null,
+          replyTo: replyToData,
+        };
+
+        const room = context.io.to(channelId);
+        const target = context.socketId ? room.except(context.socketId) : room;
+        target.emit('new_message', { channelId, message: payload });
+      }
+
       return message;
     },
 

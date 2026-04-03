@@ -1,34 +1,10 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { useMutation, type ApolloCache } from '@apollo/client';
+import { useMutation } from '@apollo/client';
 import { useApp } from '../context/AppContext';
-import { GET_CHANNELS, GET_MESSAGES, SEND_MESSAGE } from '../graphql/queries';
+import { SEND_MESSAGE } from '../graphql/queries';
+import { updateMessagesCache, updateChannelsCache } from '../graphql/cacheUpdaters';
 import type { MessageData } from './MessageItem';
 import './MessageComposer.css';
-
-interface MessageQueryData {
-  messages: MessageData[];
-}
-
-interface ChannelListData {
-  channels: Array<{
-    id: string;
-    name: string;
-    type: 'group' | 'dm';
-    avatarUrl: string;
-    members: Array<{
-      id: string;
-      displayName: string;
-      avatarUrl: string;
-    }>;
-    lastMessage: {
-      id: string;
-      content: string;
-      sender: { id: string; displayName: string };
-      createdAt: string;
-    } | null;
-    unreadCount: number;
-  }>;
-}
 
 interface SendMessageResult {
   sendMessage: MessageData;
@@ -39,54 +15,6 @@ interface SendMessageVariables {
     channelId: string;
     content: string;
   };
-}
-
-const MESSAGE_PAGE_SIZE = 30;
-
-function updateMessagesCache(
-  cache: ApolloCache<unknown>,
-  channelId: string,
-  nextMessage: MessageData,
-) {
-  cache.updateQuery<MessageQueryData>(
-    {
-      query: GET_MESSAGES,
-      variables: { channelId, limit: MESSAGE_PAGE_SIZE },
-    },
-    (data) => ({
-      messages: [...(data?.messages ?? []), nextMessage].slice(-MESSAGE_PAGE_SIZE),
-    }),
-  );
-}
-
-function updateChannelsCache(
-  cache: ApolloCache<unknown>,
-  channelId: string,
-  nextMessage: MessageData,
-) {
-  cache.updateQuery<ChannelListData>({ query: GET_CHANNELS }, (data) => {
-    if (!data) return data;
-
-    return {
-      channels: data.channels.map((channel) =>
-        channel.id === channelId
-          ? {
-              ...channel,
-              lastMessage: {
-                id: nextMessage.id,
-                content: nextMessage.content,
-                createdAt: nextMessage.createdAt,
-                sender: {
-                  id: nextMessage.sender.id,
-                  displayName: nextMessage.sender.displayName,
-                },
-              },
-              unreadCount: 0,
-            }
-          : channel,
-      ),
-    };
-  });
 }
 
 export default function MessageComposer() {
@@ -101,7 +29,9 @@ export default function MessageComposer() {
     update(cache, { data }) {
       if (!currentChannelId || !data?.sendMessage) return;
       updateMessagesCache(cache, currentChannelId, data.sendMessage);
-      updateChannelsCache(cache, currentChannelId, data.sendMessage);
+      updateChannelsCache(cache, currentChannelId, data.sendMessage, {
+        resetUnreadCount: true,
+      });
     },
     onCompleted() {
       setContent('');

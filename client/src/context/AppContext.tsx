@@ -1,6 +1,15 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  type ReactNode,
+} from 'react';
 import { useQuery } from '@apollo/client';
-import { GET_USERS } from '../graphql/queries';
+import { GET_USERS, GET_CHANNELS } from '../graphql/queries';
+import { getSocket } from '../socket';
 
 export interface User {
   id: string;
@@ -51,6 +60,63 @@ export function AppProvider({ children }: { children: ReactNode }) {
       sessionStorage.removeItem(STORAGE_KEY);
     }
   }, []);
+
+  // Join all channels the user belongs to
+  const { data: channelsData } = useQuery<{
+    channels: Array<{ id: string }>;
+  }>(GET_CHANNELS, {
+    fetchPolicy: 'network-only',
+    nextFetchPolicy: 'cache-first',
+    skip: !currentUser,
+  });
+  const joinedChannelIdsRef = useRef<Set<string>>(new Set());
+
+  // Manage socket connection lifecycle based on current user
+  useEffect(() => {
+    const socket = getSocket();
+    if (!currentUser) {
+      joinedChannelIdsRef.current = new Set();
+      socket.disconnect();
+      return;
+    }
+
+    socket.auth = { userId: currentUser.id };
+    socket.connect();
+
+    return () => {
+      joinedChannelIdsRef.current = new Set();
+      socket.disconnect();
+    };
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (!currentUser || !channelsData?.channels.length) return;
+
+    const socket = getSocket();
+    const channelIds = channelsData.channels.map((channel) => channel.id);
+
+    const syncJoinedChannels = (force = false) => {
+      for (const channelId of channelIds) {
+        if (!force && joinedChannelIdsRef.current.has(channelId)) continue;
+        socket.emit('join_channel', { channelId });
+        joinedChannelIdsRef.current.add(channelId);
+      }
+    };
+
+    const handleConnect = () => {
+      joinedChannelIdsRef.current = new Set();
+      syncJoinedChannels(true);
+    };
+
+    socket.on('connect', handleConnect);
+    if (socket.connected) {
+      syncJoinedChannels();
+    }
+
+    return () => {
+      socket.off('connect', handleConnect);
+    };
+  }, [currentUser?.id, channelsData]);
 
   return (
     <AppContext.Provider

@@ -4,8 +4,10 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@as-integrations/express5';
+import { Server as SocketIOServer } from 'socket.io';
 import { User, Channel, Message, ReadStatus } from './models';
 import { typeDefs, resolvers, type GqlContext } from './graphql';
+import { registerSocketHandlers } from './socket';
 
 const PORT = process.env.PORT || 4000;
 const MONGODB_URI =
@@ -14,8 +16,10 @@ const MONGODB_URI =
 export async function createApp(): Promise<{
   app: Express;
   apollo: ApolloServer<GqlContext>;
+  ioRef: { current: SocketIOServer | null };
 }> {
   const app = express();
+  const ioRef: { current: SocketIOServer | null } = { current: null };
 
   app.use(cors());
   app.use(express.json());
@@ -33,11 +37,13 @@ export async function createApp(): Promise<{
     expressMiddleware(apollo, {
       context: async ({ req }) => ({
         userId: (req.headers['x-user-id'] as string) || null,
+        io: ioRef.current,
+        socketId: (req.headers['x-socket-id'] as string) || null,
       }),
     }),
   );
 
-  return { app, apollo };
+  return { app, apollo, ioRef };
 }
 
 export async function connectToDatabase(uri = MONGODB_URI) {
@@ -60,13 +66,18 @@ export async function syncModelIndexes() {
 }
 
 export async function start() {
-  const { app } = await createApp();
+  const { app, ioRef } = await createApp();
   const httpServer = http.createServer(app);
+
+  const io = new SocketIOServer(httpServer, {
+    cors: { origin: '*' },
+  });
+  ioRef.current = io;
+
+  registerSocketHandlers(io);
 
   await connectToDatabase(MONGODB_URI);
   await syncModelIndexes();
-
-  // Socket.io will be wired in Slice 6
 
   httpServer.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
