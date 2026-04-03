@@ -1,0 +1,70 @@
+:root {
+  --app-bg: #141318;
+  --sidebar-bg: #1d1b22;
+  --sidebar-row-hover: #25222c;
+  --sidebar-row-active: #2a2733;
+  --panel-bg: #26242c;
+  --panel-elevated: #2b2832;
+  --border-color: #3a3642;
+  --text-primary: #f2eef6;
+  --text-secondary: #9d97ad;
+  --text-muted: #7c768a;
+  --bubble-other: #4f4a5e;
+  --bubble-self: #86d6c2;
+  --danger: #ff8a8a;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--app-bg);
+  color: var(--text-primary);
+  height: 100vh;
+  overflow: hidden;
+}
+
+#root {
+  height: 100vh;
+  background: var(--app-bg);
+}
+
+/* Two-column layout */
+.app-layout {
+  display: flex;
+  height: 100vh;
+  background: var(--app-bg);
+}
+
+.sidebar {
+  width: 340px;
+  min-width: 340px;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.main-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+  background: var(--panel-bg);
+}
+
+.empty-state {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  background: var(--panel-bg);
+}

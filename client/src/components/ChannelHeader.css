@@ -1,0 +1,15 @@
+.channel-header {
+  display: flex;
+  align-items: center;
+  padding: 1.05rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--panel-elevated);
+  min-height: 70px;
+}
+
+.channel-header-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}

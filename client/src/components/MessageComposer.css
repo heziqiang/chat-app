@@ -1,0 +1,42 @@
+.message-composer {
+  padding: 1rem 1.25rem 1.05rem;
+  border-top: 1px solid var(--border-color);
+  background: var(--panel-elevated);
+}
+
+.message-composer-form {
+  display: block;
+}
+
+.message-composer-input {
+  width: 100%;
+  min-height: 28px;
+  max-height: 120px;
+  resize: none;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-primary);
+  padding: 0;
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.65;
+  outline: none;
+  box-shadow: none;
+  caret-color: var(--text-primary);
+}
+
+.message-composer-input::placeholder {
+  color: var(--text-muted);
+}
+
+.message-composer-input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.message-composer-error {
+  margin-top: 0.55rem;
+  color: var(--danger);
+  font-size: 0.76rem;
+}
