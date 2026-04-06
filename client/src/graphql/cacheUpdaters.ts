@@ -53,7 +53,7 @@ export function updateMessagesCache(
     query: GET_MESSAGES,
     variables,
     data: {
-      messages: [...existing, nextMessage].slice(-MESSAGE_PAGE_SIZE),
+      messages: [...existing, nextMessage],
     },
   });
 }
@@ -84,6 +84,9 @@ export function updateChannelsCache(
   cache.updateQuery<ChannelListData>({ query: GET_CHANNELS }, (data) => {
     if (!data) return data;
 
+    const shouldResetUnread =
+      options.resetUnreadCount ?? options.activeChannelId === channelId;
+
     return {
       channels: data.channels.map((channel) =>
         channel.id === channelId
@@ -98,10 +101,7 @@ export function updateChannelsCache(
                   displayName: nextMessage.sender.displayName,
                 },
               },
-              unreadCount:
-                options.resetUnreadCount || options.activeChannelId === channelId
-                  ? 0
-                  : channel.unreadCount + 1,
+              unreadCount: shouldResetUnread ? 0 : channel.unreadCount + 1,
             }
           : channel,
       ),

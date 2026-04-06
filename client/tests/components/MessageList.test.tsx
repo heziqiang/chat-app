@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { MESSAGE_PAGE_SIZE } from '../../src/graphql/cacheUpdaters';
 import MessageList from '../../src/components/MessageList';
 
 const useAppMock = vi.fn();
@@ -40,6 +41,7 @@ describe('MessageList', () => {
       data: { messages: [] },
       loading: false,
       error: null,
+      fetchMore: vi.fn(),
     });
 
     render(<MessageList />);
@@ -72,11 +74,94 @@ describe('MessageList', () => {
       },
       loading: false,
       error: null,
+      fetchMore: vi.fn(),
     });
 
     render(<MessageList />);
 
     expect(screen.getByText('Grace Hopper')).toBeInTheDocument();
     expect(screen.getByText('Hello from Grace')).toBeInTheDocument();
+  });
+
+  it('loads older messages when scrolled to the top', async () => {
+    const fetchMoreMock = vi.fn().mockResolvedValue({
+      data: {
+        messages: [
+          {
+            id: 'older-message',
+            content: 'Older message',
+            createdAt: '2025-01-01T09:00:00.000Z',
+            sender: {
+              id: 'u2',
+              username: 'grace',
+              displayName: 'Grace Hopper',
+              avatarUrl: 'https://example.com/grace.png',
+            },
+            replyTo: null,
+          },
+        ],
+      },
+    });
+
+    useAppMock.mockReturnValue({
+      currentChannelId: 'channel-1',
+      currentUser: { id: 'u1' },
+    });
+    useApolloClientMock.mockReturnValue({ cache: { updateQuery: vi.fn() } });
+    useQueryMock.mockReturnValue({
+      data: {
+        messages: Array.from({ length: MESSAGE_PAGE_SIZE }, (_, index) => ({
+          id: `message-${index + 1}`,
+          content: `Message ${index + 1}`,
+          createdAt: `2025-01-01T10:${String(index).padStart(2, '0')}:00.000Z`,
+          sender: {
+            id: 'u2',
+            username: 'grace',
+            displayName: 'Grace Hopper',
+            avatarUrl: 'https://example.com/grace.png',
+          },
+          replyTo: null,
+        })),
+      },
+      loading: false,
+      error: null,
+      fetchMore: fetchMoreMock,
+    });
+
+    const { container } = render(<MessageList />);
+    const list = container.querySelector('.message-list') as HTMLDivElement | null;
+
+    expect(list).not.toBeNull();
+
+    Object.defineProperty(list!, 'scrollHeight', {
+      configurable: true,
+      value: 1200,
+      writable: true,
+    });
+    Object.defineProperty(list!, 'clientHeight', {
+      configurable: true,
+      value: 600,
+      writable: true,
+    });
+    Object.defineProperty(list!, 'scrollTop', {
+      configurable: true,
+      value: 0,
+      writable: true,
+    });
+
+    fireEvent.scroll(list!);
+
+    await waitFor(() => {
+      expect(fetchMoreMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variables: {
+            channelId: 'channel-1',
+            limit: MESSAGE_PAGE_SIZE,
+            before: 'message-1',
+          },
+          updateQuery: expect.any(Function),
+        }),
+      );
+    });
   });
 });

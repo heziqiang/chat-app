@@ -8,6 +8,17 @@
   background: var(--panel-bg);
 }
 
+.message-list-history-state {
+  align-self: center;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--panel-elevated);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.01em;
+}
+
 .message-list-state {
   flex: 1;
   display: flex;
