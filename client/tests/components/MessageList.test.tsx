@@ -25,6 +25,7 @@ vi.mock('@apollo/client', async () => {
     ...actual,
     useApolloClient: useApolloClientMock,
     useQuery: useQueryMock,
+    useMutation: () => [vi.fn().mockResolvedValue({ data: { markAsRead: true } })],
   };
 });
 
@@ -51,7 +52,7 @@ describe('MessageList', () => {
       currentChannelId: 'channel-1',
       currentUser: { id: 'u1' },
     });
-    useApolloClientMock.mockReturnValue({ cache: {} });
+    useApolloClientMock.mockReturnValue({ cache: { updateQuery: vi.fn() } });
     useQueryMock.mockReturnValue({
       data: {
         messages: [

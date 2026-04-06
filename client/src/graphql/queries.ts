@@ -62,6 +62,12 @@ export const GET_MESSAGES = gql`
   }
 `;
 
+export const MARK_AS_READ = gql`
+  mutation MarkAsRead($channelId: ID!, $messageId: ID!) {
+    markAsRead(channelId: $channelId, messageId: $messageId)
+  }
+`;
+
 export const SEND_MESSAGE = gql`
   mutation SendMessage($input: SendMessageInput!) {
     sendMessage(input: $input) {

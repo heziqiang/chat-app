@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { useQuery, useApolloClient } from '@apollo/client';
+import { useQuery, useMutation, useApolloClient } from '@apollo/client';
 import { useApp } from '../context/AppContext';
-import { GET_MESSAGES } from '../graphql/queries';
+import { GET_MESSAGES, MARK_AS_READ } from '../graphql/queries';
 import { getSocket } from '../socket';
-import { updateMessagesCache, updateChannelsCache } from '../graphql/cacheUpdaters';
+import { updateMessagesCache, updateChannelsCache, resetChannelUnreadCount } from '../graphql/cacheUpdaters';
 import MessageItem, { type MessageData } from './MessageItem';
 import './MessageList.css';
 
@@ -11,6 +11,7 @@ export default function MessageList() {
   const { currentChannelId } = useApp();
   const bottomRef = useRef<HTMLDivElement>(null);
   const client = useApolloClient();
+  const [markAsRead] = useMutation<{ markAsRead: boolean }>(MARK_AS_READ);
 
   const { data, loading, error } = useQuery<{ messages: MessageData[] }>(
     GET_MESSAGES,
@@ -21,6 +22,17 @@ export default function MessageList() {
   );
 
   const messages = data?.messages ?? [];
+  const lastMessageId = messages.length > 0 ? messages[messages.length - 1].id : null;
+
+  // Mark channel as read when entering or when new messages arrive
+  useEffect(() => {
+    if (!currentChannelId || !lastMessageId) return;
+
+    resetChannelUnreadCount(client.cache, currentChannelId);
+    markAsRead({
+      variables: { channelId: currentChannelId, messageId: lastMessageId },
+    }).catch(() => {/* best-effort */});
+  }, [currentChannelId, lastMessageId, client.cache, markAsRead]);
 
   // Listen for real-time new messages via Socket.io
   useEffect(() => {

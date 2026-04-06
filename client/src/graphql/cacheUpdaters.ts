@@ -58,6 +58,23 @@ export function updateMessagesCache(
   });
 }
 
+export function resetChannelUnreadCount(
+  cache: ApolloCache<unknown>,
+  channelId: string,
+) {
+  cache.updateQuery<ChannelListData>({ query: GET_CHANNELS }, (data) => {
+    if (!data) return data;
+    const channel = data.channels.find((c) => c.id === channelId);
+    if (!channel || channel.unreadCount === 0) return data;
+
+    return {
+      channels: data.channels.map((c) =>
+        c.id === channelId ? { ...c, unreadCount: 0 } : c,
+      ),
+    };
+  });
+}
+
 export function updateChannelsCache(
   cache: ApolloCache<unknown>,
   channelId: string,
