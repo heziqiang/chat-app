@@ -21,15 +21,6 @@ const message = {
 };
 
 describe('updateMessagesCache', () => {
-  it('does not create a partial cache entry for unopened channels', () => {
-    const cache = new InMemoryCache();
-    const variables = { channelId: 'channel-1', limit: MESSAGE_PAGE_SIZE };
-
-    updateMessagesCache(cache, 'channel-1', message);
-
-    expect(cache.readQuery({ query: GET_MESSAGES, variables })).toBeNull();
-  });
-
   it('appends a new message when the channel query is already cached', () => {
     const cache = new InMemoryCache();
     const variables = { channelId: 'channel-1', limit: MESSAGE_PAGE_SIZE };

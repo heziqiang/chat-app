@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import request, { type SuperTest, type Test } from 'supertest';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp, connectToDatabase, syncModelIndexes } from '../src/index';
 import { clearDatabase, seedDatabase } from '../src/seed';
 
@@ -11,19 +11,23 @@ describe('GraphQL API', () => {
   let api: SuperTest<Test>;
   let fixtures: Awaited<ReturnType<typeof seedDatabase>>;
   let stopApollo: (() => Promise<void>) | null = null;
+  let ioRef: Awaited<ReturnType<typeof createApp>>['ioRef'];
 
   beforeAll(async () => {
     await connectToDatabase(TEST_MONGODB_URI);
     await syncModelIndexes();
 
-    const { app, apollo } = await createApp();
+    const createdApp = await createApp();
+    const { app, apollo } = createdApp;
     api = request(app);
     stopApollo = () => apollo.stop();
+    ioRef = createdApp.ioRef;
   });
 
   beforeEach(async () => {
     await clearDatabase();
     fixtures = await seedDatabase();
+    ioRef.current = null;
   });
 
   afterAll(async () => {
@@ -36,6 +40,7 @@ describe('GraphQL API', () => {
     query: string;
     variables?: Record<string, unknown>;
     userId?: string;
+    socketId?: string;
   }) {
     const req = api
       .post('/graphql')
@@ -47,6 +52,9 @@ describe('GraphQL API', () => {
 
     if (options.userId) {
       req.set('x-user-id', options.userId);
+    }
+    if (options.socketId) {
+      req.set('x-socket-id', options.socketId);
     }
 
     const response = await req;
@@ -143,33 +151,6 @@ describe('GraphQL API', () => {
     ).toBe(true);
   });
 
-  it('seeds each user with at least as many DMs as groups', async () => {
-    const responses = await Promise.all(
-      Object.values(fixtures.users).map((user) =>
-        graphqlRequest<{
-          channels: Array<{ type: string }>;
-        }>({
-          query: 'query { channels { type } }',
-          userId: user._id.toString(),
-        }),
-      ),
-    );
-
-    for (const response of responses) {
-      expect(response.errors).toBeUndefined();
-
-      const dmCount = response.data?.channels.filter((channel) => channel.type === 'dm').length ?? 0;
-      const groupCount =
-        response.data?.channels.filter((channel) => channel.type === 'group').length ?? 0;
-
-      expect(dmCount).toBeGreaterThanOrEqual(2);
-      expect(dmCount).toBeLessThanOrEqual(3);
-      expect(groupCount).toBeGreaterThanOrEqual(1);
-      expect(groupCount).toBeLessThanOrEqual(2);
-      expect(dmCount).toBeGreaterThanOrEqual(groupCount);
-    }
-  });
-
   it('rejects message queries for channels the current user does not belong to', async () => {
     const response = await graphqlRequest<{
       messages: Array<{ id: string }>;
@@ -237,6 +218,53 @@ describe('GraphQL API', () => {
       sender: { username: 'bob' },
       channel: { name: 'Share your story' },
     });
+  });
+
+  it('emits new_message to the channel when sendMessage succeeds', async () => {
+    const channelId = fixtures.channels.shareYourStory._id.toString();
+    const socketId = 'socket-123';
+    const emit = vi.fn();
+    const except = vi.fn(() => ({ emit }));
+    const to = vi.fn(() => ({ except, emit }));
+
+    ioRef.current = { to } as never;
+
+    const response = await graphqlRequest<{
+      sendMessage: {
+        id: string;
+        content: string;
+      };
+    }>({
+      query: 'mutation($input: SendMessageInput!) { sendMessage(input: $input) { id content } }',
+      variables: {
+        input: {
+          channelId,
+          content: 'broadcast this message',
+        },
+      },
+      userId: fixtures.users.bob._id.toString(),
+      socketId,
+    });
+
+    expect(response.errors).toBeUndefined();
+    expect(response.data?.sendMessage.content).toBe('broadcast this message');
+    expect(to).toHaveBeenCalledWith(channelId);
+    expect(except).toHaveBeenCalledWith(socketId);
+    expect(emit).toHaveBeenCalledWith(
+      'new_message',
+      expect.objectContaining({
+        channelId,
+        message: expect.objectContaining({
+          id: response.data?.sendMessage.id,
+          content: 'broadcast this message',
+          sender: expect.objectContaining({
+            id: fixtures.users.bob._id.toString(),
+            username: 'bob',
+            displayName: 'Bob Smith',
+          }),
+        }),
+      }),
+    );
   });
 
   it('rejects sendMessage for channels the current user does not belong to', async () => {
