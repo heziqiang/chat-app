@@ -41,6 +41,7 @@ describe('MessageComposer', () => {
     render(<MessageComposer />);
 
     const input = screen.getByPlaceholderText('Type a message...');
+    expect(input).toHaveAttribute('rows', '2');
     await user.type(input, '  Hello team  ');
     await user.keyboard('{Enter}');
 

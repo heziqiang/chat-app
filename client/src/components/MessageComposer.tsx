@@ -53,7 +53,7 @@ export default function MessageComposer() {
     const textarea = textareaRef.current;
     if (!textarea) return;
     textarea.style.height = '0px';
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
   }, [content]);
 
   const trimmedContent = content.trim();
@@ -93,7 +93,7 @@ export default function MessageComposer() {
           onChange={(event) => setContent(event.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Type a message..."
-          rows={1}
+          rows={2}
         />
       </div>
       {error ? <div className="message-composer-error">Failed to send message.</div> : null}

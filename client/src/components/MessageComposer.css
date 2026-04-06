@@ -1,5 +1,5 @@
 .message-composer {
-  padding: 1rem 1.25rem 1.05rem;
+  padding: 1rem 1.25rem 1.1rem;
   border-top: 1px solid var(--border-color);
   background: var(--panel-elevated);
 }
@@ -10,8 +10,8 @@
 
 .message-composer-input {
   width: 100%;
-  min-height: 28px;
-  max-height: 120px;
+  min-height: 44px;
+  max-height: 160px;
   resize: none;
   border: none;
   border-radius: 0;
