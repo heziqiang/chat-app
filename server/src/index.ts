@@ -1,4 +1,6 @@
 import express, { type Express } from 'express';
+import path from 'path';
+import fs from 'fs';
 import http from 'http';
 import mongoose from 'mongoose';
 import cors from 'cors';
@@ -42,6 +44,15 @@ export async function createApp(): Promise<{
       }),
     }),
   );
+
+  // Serve client static files in production (Docker build copies to ../public)
+  const publicPath = path.join(__dirname, '..', 'public');
+  if (fs.existsSync(publicPath)) {
+    app.use(express.static(publicPath));
+    app.get('*', (_req, res) => {
+      res.sendFile(path.join(publicPath, 'index.html'));
+    });
+  }
 
   return { app, apollo, ioRef };
 }

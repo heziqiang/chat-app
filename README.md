@@ -1,72 +1,103 @@
 # Gradual Chat
 
-A channel-based messaging app with real-time sync, built with React, GraphQL, and Socket.io.
+A real-time channel messaging app built as a full-stack demo. Supports group channels, direct messages, quote replies, unread tracking, and live message sync.
 
-## Tech Stack
+**Tech stack**: React + TypeScript / Node.js + Apollo Server 5 + Express / MongoDB / Socket.io / GraphQL
 
-- Frontend: React + TypeScript + Vite + Apollo Client
-- Backend: Node.js + TypeScript + Express + Apollo Server + Socket.io
-- Database: MongoDB + Mongoose
+## Quick Start (Docker)
 
-## Project Structure
+```bash
+# 1. Configure database connection
+cp .env.example .env
+# Edit .env — fill in your MongoDB Atlas connection string
 
-- `client/` — React frontend
-- `server/` — GraphQL API, seed script, backend tests
-- `docs/` — external technical design
+# 2. Start the app
+docker compose up -d --build
+
+# 3. Seed sample data
+docker compose exec app node dist/seed/index.js
+
+# 4. Open the app
+open http://localhost
+```
+
+To stop:
+
+```bash
+docker compose down
+```
 
 ## Local Development
 
-Prerequisite: MongoDB running at `mongodb://localhost:27017/gradual-chat`.
-
-Install dependencies:
-
 ```bash
-npm install
+# 1. Install dependencies
 npm run install:all
-```
 
-Seed data:
-
-```bash
+# 2. Seed the database (defaults to localhost:27017, or set MONGODB_URI for Atlas)
 npm run seed
+
+# 3. Start server (port 4000) and client (port 5173)
+npm run dev
 ```
 
-Start backend and frontend in separate terminals:
+To use Atlas instead of local MongoDB:
 
 ```bash
-cd server && npm run dev
+export MONGODB_URI="mongodb+srv://user:pass@cluster0.xxxxx.mongodb.net/gradual-chat"
+npm run seed && npm run dev
 ```
 
-```bash
-cd client && npm run dev
-```
-
-- Frontend: `http://localhost:5173`
-- Backend: `http://localhost:4000`
+Then open http://localhost:5173. The Vite dev server proxies `/graphql` and `/socket.io` to the backend automatically.
 
 ## Testing
 
-Backend tests:
-
 ```bash
-cd server && npm test
+cd server && npm test    # Backend: Vitest + Supertest
+cd client && npm test    # Frontend: Vitest + React Testing Library
 ```
 
-Frontend tests:
+## Features
 
-```bash
-cd client && npm test
+- **Channel list** — group & DM channels with last-message preview and unread badge
+- **Message feed** — chronological display, own messages right-aligned (teal), others left-aligned (dark)
+- **Send messages** — Enter to send, Shift+Enter for newline
+- **Real-time sync** — Socket.io broadcast; open two tabs with different users to verify
+- **Quote reply** — click reply on a message, quoted block appears in the new message
+- **Unread count** — badge on channel list, resets when you enter the channel
+- **User switching** — pick a user on launch, switch anytime from the sidebar header
+- **Group member list** — click the members icon in group channel header
+
+## User Identity
+
+No authentication — select a user from the picker on launch. Each browser tab maintains its own session via `sessionStorage`. Open two tabs, pick different users, and chat between them.
+
+## Project Structure
+
+```
+server/          Node.js + Apollo Server + Socket.io
+  src/
+    graphql/     Schema, resolvers
+    models/      Mongoose models (User, Channel, Message, ReadStatus)
+    seed/        Database seeding script
+    socket.ts    Socket.io event handlers
+    index.ts     Server entry point
+
+client/          React + Vite + Apollo Client
+  src/
+    components/  UI components
+    context/     React context (current user, channel)
+    graphql/     Queries, mutations, cache updaters
+    socket.ts    Socket.io client singleton
 ```
 
-## Docker
+## Architecture
 
-Current [docker-compose.yml](/Users/heziqiang/code/gradual-chat-app/docker-compose.yml) only starts MongoDB:
-
-```bash
-docker compose up -d mongodb
-```
-
-It does not yet run the frontend and backend containers.
+- **Writes**: GraphQL mutations (sendMessage, markAsRead)
+- **Reads**: GraphQL queries with Apollo Client cache
+- **Real-time**: Socket.io broadcasts new messages to other users in the channel (sender excluded to avoid duplicates)
+- **Pagination**: Cursor-based using MongoDB `_id` (`limit` + `before` params)
+- **Database**: MongoDB, local or cloud (Atlas)
+- **Static files**: Express serves the client build output via `express.static` for demo simplicity; production would use CDN + S3
 
 ## Docs
 
