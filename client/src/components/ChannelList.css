@@ -140,17 +140,22 @@
 .channel-row-badge {
   position: absolute;
   top: -4px;
-  right: -4px;
+  right: -5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: #ff4d43;
   color: #fff;
-  font-size: 0.65rem;
+  font-size: 0.58rem;
   font-weight: 700;
   line-height: 1;
-  padding: 2px 5px;
-  border-radius: 10px;
+  height: 18px;
   min-width: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
   text-align: center;
-  border: 2px solid var(--sidebar-bg);
+  border: none;
+  box-sizing: border-box;
 }
 
 .channel-row-preview {
