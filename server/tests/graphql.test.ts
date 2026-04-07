@@ -227,6 +227,50 @@ describe('GraphQL API', () => {
     });
   });
 
+  it('creates a quoted reply with replyTo data', async () => {
+    const replyTarget = fixtures.messages.productTeam.find((message) => !message.replyToId);
+    const replySender = Object.values(fixtures.users).find(
+      (user) => user._id.toString() === replyTarget?.senderId.toString(),
+    );
+
+    expect(replyTarget).toBeDefined();
+    expect(replySender).toBeDefined();
+
+    const response = await graphqlRequest<{
+      sendMessage: {
+        content: string;
+        replyTo: {
+          id: string;
+          content: string;
+          sender: { displayName: string };
+        } | null;
+      };
+    }>({
+      query:
+        'mutation($input: SendMessageInput!) { sendMessage(input: $input) { content replyTo { id content sender { displayName } } } }',
+      variables: {
+        input: {
+          channelId: fixtures.channels.productTeam._id.toString(),
+          content: 'quoted reply from test',
+          replyTo: replyTarget?._id.toString(),
+        },
+      },
+      userId: fixtures.users.alice._id.toString(),
+    });
+
+    expect(response.errors).toBeUndefined();
+    expect(response.data?.sendMessage).toEqual({
+      content: 'quoted reply from test',
+      replyTo: {
+        id: replyTarget!._id.toString(),
+        content: replyTarget!.content,
+        sender: {
+          displayName: replySender!.displayName,
+        },
+      },
+    });
+  });
+
   it('emits new_message to the channel when sendMessage succeeds', async () => {
     const channelId = fixtures.channels.shareYourStory._id.toString();
     const socketId = 'socket-123';
@@ -277,6 +321,63 @@ describe('GraphQL API', () => {
             username: 'bob',
             displayName: 'Bob Smith',
           }),
+        }),
+      }),
+    );
+  });
+
+  it('emits quoted reply payload when sendMessage succeeds', async () => {
+    const channelId = fixtures.channels.productTeam._id.toString();
+    const socketId = 'socket-456';
+    const emit = vi.fn();
+    const except = vi.fn(() => ({ emit }));
+    const to = vi.fn(() => ({ except, emit }));
+    const replyTarget = fixtures.messages.productTeam.find((message) => !message.replyToId);
+    const replySender = Object.values(fixtures.users).find(
+      (user) => user._id.toString() === replyTarget?.senderId.toString(),
+    );
+
+    expect(replyTarget).toBeDefined();
+    expect(replySender).toBeDefined();
+
+    ioRef.current = { to } as never;
+
+    const response = await graphqlRequest<{
+      sendMessage: {
+        id: string;
+        content: string;
+      };
+    }>({
+      query: 'mutation($input: SendMessageInput!) { sendMessage(input: $input) { id content } }',
+      variables: {
+        input: {
+          channelId,
+          content: 'broadcast quoted reply',
+          replyTo: replyTarget?._id.toString(),
+        },
+      },
+      userId: fixtures.users.alice._id.toString(),
+      socketId,
+    });
+
+    expect(response.errors).toBeUndefined();
+    expect(to).toHaveBeenCalledWith(channelId);
+    expect(except).toHaveBeenCalledWith(socketId);
+    expect(emit).toHaveBeenCalledWith(
+      'new_message',
+      expect.objectContaining({
+        channelId,
+        message: expect.objectContaining({
+          id: response.data?.sendMessage.id,
+          content: 'broadcast quoted reply',
+          replyTo: {
+            id: replyTarget!._id.toString(),
+            content: replyTarget!.content,
+            sender: {
+              id: replySender!._id.toString(),
+              displayName: replySender!.displayName,
+            },
+          },
         }),
       }),
     );

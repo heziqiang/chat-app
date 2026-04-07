@@ -47,6 +47,25 @@ export const messageResolvers = {
         throw new Error('Message content cannot be empty');
       }
       const { channel } = await requireChannelAccess(channelId, context);
+      let replyMessage: Awaited<ReturnType<typeof Message.findOne>> | null = null;
+      let replySender: Awaited<ReturnType<typeof User.findById>> | null = null;
+
+      if (replyTo) {
+        if (!Types.ObjectId.isValid(replyTo)) {
+          throw new Error('Quoted message is invalid');
+        }
+
+        replyMessage = await Message.findOne({
+          _id: new Types.ObjectId(replyTo),
+          channelId: new Types.ObjectId(channelId),
+        });
+        if (!replyMessage) {
+          throw new Error('Quoted message not found');
+        }
+
+        replySender = await User.findById(replyMessage.senderId);
+      }
+
       const mentionIds = mentions ?? [];
       const mentionObjectIds = mentionIds.map((id) => new Types.ObjectId(id));
       const channelMemberIds = new Set(channel.memberUserIds.map((id) => id.toString()));
@@ -78,27 +97,22 @@ export const messageResolvers = {
         channelId: new Types.ObjectId(channelId),
         senderId: new Types.ObjectId(userId),
         content,
-        replyToId: replyTo ? new Types.ObjectId(replyTo) : null,
+        replyToId: replyMessage?._id ?? null,
         mentionUserIds: mentionObjectIds,
       });
 
       // Broadcast to other users in the channel
       if (context.io) {
         const sender = await User.findById(message.senderId);
-        let replyToData = null;
-        if (message.replyToId) {
-          const replyMsg = await Message.findById(message.replyToId);
-          if (replyMsg) {
-            const replySender = await User.findById(replyMsg.senderId);
-            replyToData = {
-              id: replyMsg._id.toString(),
-              content: replyMsg.content,
+        const replyToData = replyMessage
+          ? {
+              id: replyMessage._id.toString(),
+              content: replyMessage.content,
               sender: replySender
                 ? { id: replySender._id.toString(), displayName: replySender.displayName }
                 : null,
-            };
-          }
-        }
+            }
+          : null;
 
         const payload = {
           id: message._id.toString(),
