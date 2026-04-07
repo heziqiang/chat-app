@@ -50,7 +50,7 @@ export async function createApp(): Promise<{
   const publicPath = path.join(__dirname, '..', 'public');
   if (fs.existsSync(publicPath)) {
     app.use(express.static(publicPath));
-    app.get('*', (_req, res) => {
+    app.get('/{*splat}', (_req, res) => {
       res.sendFile(path.join(publicPath, 'index.html'));
     });
   }
