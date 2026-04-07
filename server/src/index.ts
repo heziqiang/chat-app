@@ -1,3 +1,4 @@
+import './loadEnv';
 import express, { type Express } from 'express';
 import path from 'path';
 import fs from 'fs';

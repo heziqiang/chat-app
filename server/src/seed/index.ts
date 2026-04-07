@@ -1,3 +1,4 @@
+import '../loadEnv';
 import mongoose from 'mongoose';
 import { User, Channel, Message, ReadStatus } from '../models';
 
