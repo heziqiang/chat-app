@@ -46,13 +46,40 @@ export const messageResolvers = {
       if (!content.trim()) {
         throw new Error('Message content cannot be empty');
       }
-      await requireChannelAccess(channelId, context);
+      const { channel } = await requireChannelAccess(channelId, context);
+      const mentionIds = mentions ?? [];
+      const mentionObjectIds = mentionIds.map((id) => new Types.ObjectId(id));
+      const channelMemberIds = new Set(channel.memberUserIds.map((id) => id.toString()));
+
+      if (mentionObjectIds.some((id) => !channelMemberIds.has(id.toString()))) {
+        throw new Error('Mentioned users must belong to the channel');
+      }
+
+      const mentionedUsers = mentionObjectIds.length
+        ? await User.find({ _id: { $in: mentionObjectIds } })
+        : [];
+      const mentionedUsersById = new Map(
+        mentionedUsers.map((user) => [user._id.toString(), user] as const),
+      );
+      const mentionPayload = mentionObjectIds.map((id) => {
+        const mentionedUser = mentionedUsersById.get(id.toString());
+        if (!mentionedUser) {
+          throw new Error('Mentioned users must belong to the channel');
+        }
+
+        return {
+          id: mentionedUser._id.toString(),
+          username: mentionedUser.username,
+          displayName: mentionedUser.displayName,
+        };
+      });
+
       const message = await Message.create({
         channelId: new Types.ObjectId(channelId),
         senderId: new Types.ObjectId(userId),
         content,
         replyToId: replyTo ? new Types.ObjectId(replyTo) : null,
-        mentionUserIds: mentions?.map((id) => new Types.ObjectId(id)) ?? [],
+        mentionUserIds: mentionObjectIds,
       });
 
       // Broadcast to other users in the channel
@@ -85,6 +112,7 @@ export const messageResolvers = {
                 avatarUrl: sender.avatarUrl,
               }
             : null,
+          mentions: mentionPayload,
           replyTo: replyToData,
         };
 
