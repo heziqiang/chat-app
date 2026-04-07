@@ -199,14 +199,20 @@ describe('GraphQL API', () => {
         content: string;
         sender: { username: string };
         channel: { name: string };
+        mentions: Array<{ username: string }>;
       };
     }>({
       query:
-        'mutation($input: SendMessageInput!) { sendMessage(input: $input) { content sender { username } channel { name } } }',
+        'mutation($input: SendMessageInput!) { sendMessage(input: $input) { content sender { username } channel { name } mentions { username } } }',
       variables: {
         input: {
           channelId: fixtures.channels.shareYourStory._id.toString(),
           content: 'backend test message',
+          mentions: [
+            fixtures.users.alice._id.toString(),
+            fixtures.users.carol._id.toString(),
+            fixtures.users.alice._id.toString(),
+          ],
         },
       },
       userId: fixtures.users.bob._id.toString(),
@@ -217,6 +223,7 @@ describe('GraphQL API', () => {
       content: 'backend test message',
       sender: { username: 'bob' },
       channel: { name: 'Share your story' },
+      mentions: [{ username: 'alice' }, { username: 'carol' }],
     });
   });
 
@@ -240,6 +247,7 @@ describe('GraphQL API', () => {
         input: {
           channelId,
           content: 'broadcast this message',
+          mentions: [fixtures.users.alice._id.toString()],
         },
       },
       userId: fixtures.users.bob._id.toString(),
@@ -257,6 +265,13 @@ describe('GraphQL API', () => {
         message: expect.objectContaining({
           id: response.data?.sendMessage.id,
           content: 'broadcast this message',
+          mentions: [
+            {
+              id: fixtures.users.alice._id.toString(),
+              username: 'alice',
+              displayName: 'Alice Chen',
+            },
+          ],
           sender: expect.objectContaining({
             id: fixtures.users.bob._id.toString(),
             username: 'bob',
@@ -265,6 +280,26 @@ describe('GraphQL API', () => {
         }),
       }),
     );
+  });
+
+  it('rejects sendMessage when mentioned users are outside the channel', async () => {
+    const response = await graphqlRequest<{
+      sendMessage: { id: string };
+    }>({
+      query:
+        'mutation($input: SendMessageInput!) { sendMessage(input: $input) { id } }',
+      variables: {
+        input: {
+          channelId: fixtures.channels.dmAliceBob._id.toString(),
+          content: 'should fail',
+          mentions: [fixtures.users.carol._id.toString()],
+        },
+      },
+      userId: fixtures.users.alice._id.toString(),
+    });
+
+    expect(response.data).toBeNull();
+    expect(response.errors?.[0]?.message).toBe('Mentioned users must belong to the channel');
   });
 
   it('rejects sendMessage for channels the current user does not belong to', async () => {

@@ -1,5 +1,12 @@
+import type { ReactNode } from 'react';
 import { useApp } from '../context/AppContext';
 import './MessageItem.css';
+
+export interface MentionData {
+  id: string;
+  username: string;
+  displayName: string;
+}
 
 export interface MessageData {
   id: string;
@@ -11,11 +18,68 @@ export interface MessageData {
     displayName: string;
     avatarUrl: string;
   };
+  mentions: MentionData[];
   replyTo: {
     id: string;
     content: string;
     sender: { id: string; displayName: string };
   } | null;
+}
+
+function isMentionBoundary(char: string | undefined) {
+  return !char || /[\s.,!?;:()[\]{}"'`]/.test(char);
+}
+
+function renderMessageContent(content: string, mentions: MentionData[]): ReactNode {
+  if (mentions.length === 0) {
+    return content;
+  }
+
+  const mentionTokens = mentions
+    .map((mention) => ({ ...mention, token: `@${mention.displayName}` }))
+    .sort((left, right) => right.token.length - left.token.length);
+  const parts: ReactNode[] = [];
+  let cursor = 0;
+  let lastTextStart = 0;
+  let key = 0;
+
+  while (cursor < content.length) {
+    const match = mentionTokens.find(
+      ({ token }) =>
+        content.startsWith(token, cursor) &&
+        isMentionBoundary(content[cursor - 1]) &&
+        isMentionBoundary(content[cursor + token.length]),
+    );
+
+    if (!match) {
+      cursor += 1;
+      continue;
+    }
+
+    if (lastTextStart < cursor) {
+      parts.push(content.slice(lastTextStart, cursor));
+    }
+
+    parts.push(
+      <span
+        key={`mention-${key}`}
+        className="message-mention"
+        data-mention-user-id={match.id}
+      >
+        {match.token}
+      </span>,
+    );
+
+    key += 1;
+    cursor += match.token.length;
+    lastTextStart = cursor;
+  }
+
+  if (lastTextStart < content.length) {
+    parts.push(content.slice(lastTextStart));
+  }
+
+  return parts.length > 0 ? parts : content;
 }
 
 function formatTime(iso: string): string {
@@ -46,7 +110,7 @@ export default function MessageItem({ message, onReply }: MessageItemProps) {
         </div>
         <div className="message-bubble-wrapper">
           <div className="message-bubble">
-            <p className="message-content">{message.content}</p>
+            <p className="message-content">{renderMessageContent(message.content, message.mentions)}</p>
           </div>
           {onReply && (
             <button

@@ -17,6 +17,7 @@ const message = {
     displayName: 'Ada Lovelace',
     avatarUrl: 'https://example.com/ada.png',
   },
+  mentions: [],
   replyTo: null,
 };
 

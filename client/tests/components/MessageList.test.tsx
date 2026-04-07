@@ -60,7 +60,7 @@ describe('MessageList', () => {
         messages: [
           {
             id: 'm1',
-            content: 'Hello from Grace',
+            content: 'Hello @Grace Hopper',
             createdAt: '2025-01-01T10:00:00.000Z',
             sender: {
               id: 'u2',
@@ -68,6 +68,13 @@ describe('MessageList', () => {
               displayName: 'Grace Hopper',
               avatarUrl: 'https://example.com/grace.png',
             },
+            mentions: [
+              {
+                id: 'u2',
+                username: 'grace',
+                displayName: 'Grace Hopper',
+              },
+            ],
             replyTo: null,
           },
         ],
@@ -80,7 +87,9 @@ describe('MessageList', () => {
     render(<MessageList />);
 
     expect(screen.getByText('Grace Hopper')).toBeInTheDocument();
-    expect(screen.getByText('Hello from Grace')).toBeInTheDocument();
+    const mention = screen.getByText('@Grace Hopper');
+    expect(mention).toBeInTheDocument();
+    expect(mention).toHaveClass('message-mention');
   });
 
   it('loads older messages when scrolled to the top', async () => {
@@ -97,6 +106,7 @@ describe('MessageList', () => {
               displayName: 'Grace Hopper',
               avatarUrl: 'https://example.com/grace.png',
             },
+            mentions: [],
             replyTo: null,
           },
         ],
@@ -120,6 +130,7 @@ describe('MessageList', () => {
             displayName: 'Grace Hopper',
             avatarUrl: 'https://example.com/grace.png',
           },
+          mentions: [],
           replyTo: null,
         })),
       },

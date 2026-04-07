@@ -50,6 +50,11 @@ export const GET_MESSAGES = gql`
         displayName
         avatarUrl
       }
+      mentions {
+        id
+        username
+        displayName
+      }
       replyTo {
         id
         content
@@ -79,6 +84,11 @@ export const SEND_MESSAGE = gql`
         username
         displayName
         avatarUrl
+      }
+      mentions {
+        id
+        username
+        displayName
       }
       replyTo {
         id

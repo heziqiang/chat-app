@@ -19,11 +19,26 @@ export interface User {
   title: string;
 }
 
+export interface AppChannelMember {
+  id: string;
+  displayName: string;
+  avatarUrl: string;
+}
+
+export interface AppChannel {
+  id: string;
+  name: string;
+  type: 'group' | 'dm';
+  avatarUrl: string;
+  members: AppChannelMember[];
+}
+
 interface AppContextValue {
   currentUser: User | null;
   setCurrentUser: (user: User | null) => void;
   currentChannelId: string | null;
   setCurrentChannelId: (id: string | null) => void;
+  channels: AppChannel[];
   users: User[];
   usersLoading: boolean;
   usersError: string | null;
@@ -62,13 +77,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Join all channels the user belongs to
-  const { data: channelsData } = useQuery<{
-    channels: Array<{ id: string }>;
-  }>(GET_CHANNELS, {
+  const { data: channelsData } = useQuery<{ channels: AppChannel[] }>(GET_CHANNELS, {
     fetchPolicy: 'network-only',
     nextFetchPolicy: 'cache-first',
     skip: !currentUser,
   });
+  const channels = channelsData?.channels ?? [];
   const joinedChannelIdsRef = useRef<Set<string>>(new Set());
 
   // Manage socket connection lifecycle based on current user
@@ -90,10 +104,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [currentUser?.id]);
 
   useEffect(() => {
-    if (!currentUser || !channelsData?.channels.length) return;
+    if (!currentUser || channels.length === 0) return;
 
     const socket = getSocket();
-    const channelIds = channelsData.channels.map((channel) => channel.id);
+    const channelIds = channels.map((channel) => channel.id);
 
     const syncJoinedChannels = (force = false) => {
       for (const channelId of channelIds) {
@@ -116,7 +130,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => {
       socket.off('connect', handleConnect);
     };
-  }, [currentUser?.id, channelsData]);
+  }, [currentUser?.id, channels]);
 
   return (
     <AppContext.Provider
@@ -125,6 +139,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setCurrentUser,
         currentChannelId,
         setCurrentChannelId,
+        channels,
         users,
         usersLoading: loading,
         usersError: error?.message ?? null,
