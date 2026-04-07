@@ -14,10 +14,16 @@ interface SendMessageVariables {
   input: {
     channelId: string;
     content: string;
+    replyTo?: string;
   };
 }
 
-export default function MessageComposer() {
+interface MessageComposerProps {
+  replyingTo?: MessageData | null;
+  onClearReply?: () => void;
+}
+
+export default function MessageComposer({ replyingTo, onClearReply }: MessageComposerProps) {
   const { currentChannelId, currentUser } = useApp();
   const [content, setContent] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -35,6 +41,7 @@ export default function MessageComposer() {
     },
     onCompleted() {
       setContent('');
+      onClearReply?.();
       textareaRef.current?.focus();
     },
   });
@@ -48,6 +55,12 @@ export default function MessageComposer() {
       textareaRef.current?.focus();
     }
   }, [currentChannelId]);
+
+  useEffect(() => {
+    if (replyingTo) {
+      textareaRef.current?.focus();
+    }
+  }, [replyingTo]);
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -66,6 +79,7 @@ export default function MessageComposer() {
           input: {
             channelId: currentChannelId,
             content: trimmedContent,
+            ...(replyingTo ? { replyTo: replyingTo.id } : {}),
           },
         },
       });
@@ -95,6 +109,27 @@ export default function MessageComposer() {
           placeholder="Type a message..."
           rows={2}
         />
+        {replyingTo && (
+          <div className="composer-reply-preview">
+            <div className="composer-reply-content">
+              <span className="composer-reply-accent" aria-hidden="true" />
+              <div className="composer-reply-copy">
+                <span className="composer-reply-author">{replyingTo.sender.displayName}:</span>
+                <span className="composer-reply-text">{replyingTo.content}</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="composer-reply-close"
+              onClick={onClearReply}
+              aria-label="Cancel reply"
+            >
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M4.22 4.22a.75.75 0 0 1 1.06 0L8 6.94l2.72-2.72a.75.75 0 1 1 1.06 1.06L9.06 8l2.72 2.72a.75.75 0 0 1-1.06 1.06L8 9.06l-2.72 2.72a.75.75 0 0 1-1.06-1.06L6.94 8 4.22 5.28a.75.75 0 0 1 0-1.06Z" />
+              </svg>
+            </button>
+          </div>
+        )}
       </div>
       {error ? <div className="message-composer-error">Failed to send message.</div> : null}
     </div>

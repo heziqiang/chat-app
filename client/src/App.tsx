@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { ApolloClient, InMemoryCache, ApolloProvider, HttpLink, ApolloLink } from '@apollo/client';
 import { AppProvider, useApp } from './context/AppContext';
 import { getSocket } from './socket';
@@ -6,6 +7,7 @@ import ChannelList from './components/ChannelList';
 import ChannelHeader from './components/ChannelHeader';
 import MessageList from './components/MessageList';
 import MessageComposer from './components/MessageComposer';
+import type { MessageData } from './components/MessageItem';
 
 const httpLink = new HttpLink({ uri: '/graphql' });
 
@@ -30,6 +32,11 @@ const apolloClient = new ApolloClient({
 
 function AppContent() {
   const { currentUser, currentChannelId } = useApp();
+  const [replyingTo, setReplyingTo] = useState<MessageData | null>(null);
+
+  useEffect(() => {
+    setReplyingTo(null);
+  }, [currentChannelId]);
 
   if (!currentUser) return <UserPicker />;
 
@@ -42,8 +49,11 @@ function AppContent() {
         {currentChannelId ? (
           <>
             <ChannelHeader />
-            <MessageList />
-            <MessageComposer />
+            <MessageList onReply={setReplyingTo} />
+            <MessageComposer
+              replyingTo={replyingTo}
+              onClearReply={() => setReplyingTo(null)}
+            />
           </>
         ) : (
           <div className="empty-state">Select a channel to start chatting</div>

@@ -20,7 +20,11 @@ interface MessageQueryData {
 
 type HistoryBannerState = 'hidden' | 'loading' | 'end';
 
-export default function MessageList() {
+interface MessageListProps {
+  onReply?: (message: MessageData) => void;
+}
+
+export default function MessageList({ onReply }: MessageListProps) {
   const { currentChannelId } = useApp();
   const listRef = useRef<HTMLDivElement>(null);
   const previousChannelIdRef = useRef<string | null>(null);
@@ -246,7 +250,7 @@ export default function MessageList() {
         </div>
       )}
       {messages.map((msg) => (
-        <MessageItem key={msg.id} message={msg} />
+        <MessageItem key={msg.id} message={msg} onReply={onReply} />
       ))}
     </div>
   );

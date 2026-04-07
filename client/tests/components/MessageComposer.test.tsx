@@ -56,6 +56,55 @@ describe('MessageComposer', () => {
     expect(input).toHaveValue('');
   });
 
+  it('sends with replyTo when replyingTo is set', async () => {
+    const user = userEvent.setup();
+    const mutate = vi.fn().mockResolvedValue({ data: { sendMessage: { id: 'm2' } } });
+    const onClearReply = vi.fn();
+
+    useAppMock.mockReturnValue({
+      currentChannelId: 'channel-1',
+      currentUser: { id: 'u1' },
+    });
+    useMutationMock.mockImplementation((_, options) => [
+      async (payload: unknown) => {
+        const result = await mutate(payload);
+        options?.onCompleted?.();
+        return result;
+      },
+      { loading: false, error: null },
+    ]);
+
+    const replyingTo = {
+      id: 'msg-99',
+      content: 'Original message',
+      createdAt: '2024-01-01T00:00:00Z',
+      sender: { id: 'u2', username: 'alice', displayName: 'Alice', avatarUrl: '' },
+      replyTo: null,
+    };
+
+    render(
+      <MessageComposer replyingTo={replyingTo} onClearReply={onClearReply} />,
+    );
+
+    expect(screen.getByText('Alice:')).toBeInTheDocument();
+    expect(screen.getByText('Original message')).toBeInTheDocument();
+
+    const input = screen.getByPlaceholderText('Type a message...');
+    await user.type(input, 'Reply text');
+    await user.keyboard('{Enter}');
+
+    expect(mutate).toHaveBeenCalledWith({
+      variables: {
+        input: {
+          channelId: 'channel-1',
+          content: 'Reply text',
+          replyTo: 'msg-99',
+        },
+      },
+    });
+    expect(onClearReply).toHaveBeenCalled();
+  });
+
   it('does not send whitespace-only content', async () => {
     const user = userEvent.setup();
     const mutate = vi.fn();

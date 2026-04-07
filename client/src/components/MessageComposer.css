@@ -35,6 +35,86 @@
   box-shadow: none;
 }
 
+.composer-reply-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: fit-content;
+  max-width: min(100%, 540px);
+  margin-top: 0.55rem;
+}
+
+.composer-reply-content {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.66rem 0.88rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.055);
+  overflow: hidden;
+}
+
+.composer-reply-accent {
+  width: 3px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--bubble-self);
+  flex-shrink: 0;
+}
+
+.composer-reply-copy {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.28rem;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  line-height: 1.15;
+}
+
+.composer-reply-author {
+  font-weight: 500;
+  color: #9790a8;
+  flex-shrink: 0;
+}
+
+.composer-reply-text {
+  min-width: 0;
+  color: #9790a8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.composer-reply-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.composer-reply-close:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--text-primary);
+}
+
+.composer-reply-close svg {
+  width: 11px;
+  height: 11px;
+  fill: currentColor;
+}
+
 .message-composer-error {
   margin-top: 0.55rem;
   color: var(--danger);
