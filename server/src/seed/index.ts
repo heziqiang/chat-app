@@ -2,8 +2,13 @@ import '../loadEnv';
 import mongoose from 'mongoose';
 import { User, Channel, Message, ReadStatus } from '../models';
 
-const MONGODB_URI =
-  process.env.MONGODB_URI || 'mongodb://localhost:27017/gradual-chat';
+function getMongoUri() {
+  const mongoUri = process.env.MONGODB_URI;
+  if (!mongoUri) {
+    throw new Error('Missing MONGODB_URI. Set it in the environment or server/.env.');
+  }
+  return mongoUri;
+}
 
 const GROUP_MESSAGE_COUNTS = {
   shareYourStory: 24,
@@ -338,7 +343,7 @@ export async function seedDatabase() {
   };
 }
 
-export async function runSeed(uri = MONGODB_URI) {
+export async function runSeed(uri = getMongoUri()) {
   await mongoose.connect(uri);
   console.log('Connected to MongoDB');
 

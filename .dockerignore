@@ -5,6 +5,12 @@ server/dist
 client/dist
 coverage
 .git
+.env
+.env.*
+server/.env
+server/.env.*
+client/.env
+client/.env.*
 *.md
 docs
 plan

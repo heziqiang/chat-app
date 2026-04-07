@@ -8,8 +8,8 @@ A real-time channel messaging app built as a full-stack demo. Supports group cha
 
 ```bash
 # 1. Configure database connection
-cp .env.example .env
-# Edit .env — fill in your MongoDB Atlas connection string
+cp server/.env.example server/.env
+# Edit server/.env
 
 # 2. Start the app
 docker compose up -d --build
@@ -27,24 +27,25 @@ To stop:
 docker compose down
 ```
 
+## Deployment
+
+Deploy on a single VPS. The normal flow is: push code, SSH into the VPS, pull the latest code, configure `server/.env`, then run `docker compose up -d --build`. The app runs as one Node.js container and connects to external MongoDB.
+
 ## Local Development
 
 ```bash
 # 1. Install dependencies
 npm run install:all
 
-# 2. Seed the database (defaults to localhost:27017, or set MONGODB_URI for Atlas)
+# 2. Configure database connection
+cp server/.env.example server/.env
+# Edit server/.env
+
+# 3. Seed the database
 npm run seed
 
-# 3. Start server (port 4000) and client (port 5173)
+# 4. Start server (port 4000) and client (port 5173)
 npm run dev
-```
-
-To use Atlas instead of local MongoDB:
-
-```bash
-export MONGODB_URI="mongodb+srv://user:pass@cluster0.xxxxx.mongodb.net/gradual-chat"
-npm run seed && npm run dev
 ```
 
 Then open http://localhost:5173. The Vite dev server proxies `/graphql` and `/socket.io` to the backend automatically.
