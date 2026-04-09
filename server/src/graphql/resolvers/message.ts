@@ -148,13 +148,24 @@ export const messageResolvers = {
     ) => {
       const userId = requireUserId(context);
       await requireChannelAccess(args.channelId, context);
+      if (!Types.ObjectId.isValid(args.messageId)) {
+        throw new Error('Message not found in channel');
+      }
+
+      const channelMessage = await Message.findOne({
+        _id: new Types.ObjectId(args.messageId),
+        channelId: new Types.ObjectId(args.channelId),
+      });
+      if (!channelMessage) {
+        throw new Error('Message not found in channel');
+      }
 
       await ReadStatus.findOneAndUpdate(
         {
           userId: new Types.ObjectId(userId),
           channelId: new Types.ObjectId(args.channelId),
         },
-        { lastReadMessageId: new Types.ObjectId(args.messageId) },
+        { lastReadMessageId: channelMessage._id },
         { upsert: true },
       );
       return true;

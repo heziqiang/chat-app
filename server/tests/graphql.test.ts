@@ -483,4 +483,37 @@ describe('GraphQL API', () => {
     );
     expect(afterChannel?.unreadCount).toBe(0);
   });
+
+  it('rejects markAsRead when messageId is outside the channel', async () => {
+    const userId = fixtures.users.alice._id.toString();
+    const channelId = fixtures.channels.shareYourStory._id.toString();
+    const foreignMessageId = fixtures.messages.dmAliceBob[0]._id.toString();
+
+    const response = await graphqlRequest<{
+      markAsRead: boolean;
+    }>({
+      query:
+        'mutation($channelId: ID!, $messageId: ID!) { markAsRead(channelId: $channelId, messageId: $messageId) }',
+      variables: {
+        channelId,
+        messageId: foreignMessageId,
+      },
+      userId,
+    });
+
+    expect(response.data).toBeNull();
+    expect(response.errors?.[0]?.message).toBe('Message not found in channel');
+
+    const afterResponse = await graphqlRequest<{
+      channels: Array<{ id: string; unreadCount: number }>;
+    }>({
+      query: 'query { channels { id unreadCount } }',
+      userId,
+    });
+
+    const afterChannel = afterResponse.data?.channels.find(
+      (channel) => channel.id === channelId,
+    );
+    expect(afterChannel?.unreadCount).toBe(fixtures.messages.shareYourStory.length);
+  });
 });
