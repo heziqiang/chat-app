@@ -4,9 +4,22 @@ import { MESSAGE_PAGE_SIZE } from '../../src/graphql/cacheUpdaters';
 import MessageList from '../../src/components/MessageList';
 
 const useAppMock = vi.fn();
-const { useApolloClientMock, useQueryMock } = vi.hoisted(() => ({
+const {
+  useApolloClientMock,
+  useQueryMock,
+  socketOnMock,
+  socketOffMock,
+  updateMessagesCacheMock,
+  updateChannelsCacheMock,
+  resetChannelUnreadCountMock,
+} = vi.hoisted(() => ({
   useApolloClientMock: vi.fn(),
   useQueryMock: vi.fn(),
+  socketOnMock: vi.fn(),
+  socketOffMock: vi.fn(),
+  updateMessagesCacheMock: vi.fn(),
+  updateChannelsCacheMock: vi.fn(),
+  resetChannelUnreadCountMock: vi.fn(),
 }));
 
 vi.mock('../../src/context/AppContext', () => ({
@@ -15,10 +28,22 @@ vi.mock('../../src/context/AppContext', () => ({
 
 vi.mock('../../src/socket', () => ({
   getSocket: () => ({
-    on: vi.fn(),
-    off: vi.fn(),
+    on: socketOnMock,
+    off: socketOffMock,
   }),
 }));
+
+vi.mock('../../src/graphql/cacheUpdaters', async () => {
+  const actual = await vi.importActual<typeof import('../../src/graphql/cacheUpdaters')>(
+    '../../src/graphql/cacheUpdaters',
+  );
+  return {
+    ...actual,
+    updateMessagesCache: updateMessagesCacheMock,
+    updateChannelsCache: updateChannelsCacheMock,
+    resetChannelUnreadCount: resetChannelUnreadCountMock,
+  };
+});
 
 vi.mock('@apollo/client', async () => {
   const actual = await vi.importActual<typeof import('@apollo/client')>('@apollo/client');
@@ -28,9 +53,73 @@ vi.mock('@apollo/client', async () => {
     useQuery: useQueryMock,
     useMutation: () => [vi.fn().mockResolvedValue({ data: { markAsRead: true } })],
   };
-});
+  });
 
-describe('MessageList', () => {
+  describe('MessageList', () => {
+  it('does not reset unread count for socket messages from background channels', () => {
+    const cache = {};
+    const message = {
+      id: 'm2',
+      content: 'Background update',
+      createdAt: '2025-01-01T10:05:00.000Z',
+      sender: {
+        id: 'u2',
+        username: 'grace',
+        displayName: 'Grace Hopper',
+        avatarUrl: 'https://example.com/grace.png',
+      },
+      mentions: [],
+      replyTo: null,
+    };
+
+    useAppMock.mockReturnValue({
+      currentChannelId: 'channel-1',
+      currentUser: { id: 'u1' },
+    });
+    useApolloClientMock.mockReturnValue({ cache });
+    useQueryMock.mockReturnValue({
+      data: {
+        messages: [
+          {
+            id: 'm1',
+            content: 'Current channel message',
+            createdAt: '2025-01-01T10:00:00.000Z',
+            sender: {
+              id: 'u2',
+              username: 'grace',
+              displayName: 'Grace Hopper',
+              avatarUrl: 'https://example.com/grace.png',
+            },
+            mentions: [],
+            replyTo: null,
+          },
+        ],
+      },
+      loading: false,
+      error: null,
+      fetchMore: vi.fn(),
+    });
+
+    render(<MessageList />);
+
+    const handleNewMessage = socketOnMock.mock.calls.find(
+      ([eventName]: [string]) => eventName === 'new_message',
+    )?.[1] as ((payload: { channelId: string; message: typeof message }) => void) | undefined;
+
+    expect(handleNewMessage).toBeDefined();
+
+    handleNewMessage?.({
+      channelId: 'channel-2',
+      message,
+    });
+
+    expect(updateMessagesCacheMock).toHaveBeenCalledWith(cache, 'channel-2', message);
+    expect(updateChannelsCacheMock).toHaveBeenCalledWith(cache, 'channel-2', message, {
+      activeChannelId: 'channel-1',
+      resetUnreadCount: false,
+    });
+  });
+
   it('shows empty state when there are no messages', () => {
     useAppMock.mockReturnValue({
       currentChannelId: 'channel-1',

@@ -169,10 +169,13 @@ export default function MessageList({ onReply }: MessageListProps) {
       channelId: string;
       message: MessageData;
     }) => {
+      const shouldResetUnreadCount =
+        channelId === currentChannelId && isNearBottomRef.current;
+
       updateMessagesCache(client.cache, channelId, message);
       updateChannelsCache(client.cache, channelId, message, {
         activeChannelId: currentChannelId,
-        resetUnreadCount: isNearBottomRef.current,
+        resetUnreadCount: shouldResetUnreadCount,
       });
     };
 
