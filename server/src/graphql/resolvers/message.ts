@@ -1,8 +1,11 @@
-import { Types } from 'mongoose';
+import { type HydratedDocument, Types } from 'mongoose';
 import { Message, Channel, User, ReadStatus } from '../../models';
-import type { IMessage } from '../../models';
+import type { IMessage, IUser } from '../../models';
 import type { GqlContext } from '../index';
 import { requireChannelAccess, requireUserId } from './channel';
+
+type MessageDocument = HydratedDocument<IMessage>;
+type UserDocument = HydratedDocument<IUser>;
 
 export const messageResolvers = {
   Query: {
@@ -47,8 +50,8 @@ export const messageResolvers = {
         throw new Error('Message content cannot be empty');
       }
       const { channel } = await requireChannelAccess(channelId, context);
-      let replyMessage: Awaited<ReturnType<typeof Message.findOne>> | null = null;
-      let replySender: Awaited<ReturnType<typeof User.findById>> | null = null;
+      let replyMessage: MessageDocument | null = null;
+      let replySender: UserDocument | null = null;
 
       if (replyTo) {
         if (!Types.ObjectId.isValid(replyTo)) {
