@@ -1,15 +1,15 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useApolloClient } from '@apollo/client';
+import type { MessageData } from '../chat/types';
 import { useApp } from '../context/AppContext';
 import { GET_MESSAGES, MARK_AS_READ } from '../graphql/queries';
 import { getSocket } from '../socket';
 import {
   MESSAGE_PAGE_SIZE,
   updateMessagesCache,
-  updateChannelsCache,
   resetChannelUnreadCount,
 } from '../graphql/cacheUpdaters';
-import MessageItem, { type MessageData } from './MessageItem';
+import MessageItem from './MessageItem';
 import './MessageList.css';
 
 const SCROLL_EDGE_THRESHOLD = 48;
@@ -22,15 +22,20 @@ type HistoryBannerState = 'hidden' | 'loading' | 'end';
 
 interface MessageListProps {
   onReply?: (message: MessageData) => void;
+  onLatestMessageVisibilityChange?: (visible: boolean) => void;
 }
 
-export default function MessageList({ onReply }: MessageListProps) {
+export default function MessageList({
+  onReply,
+  onLatestMessageVisibilityChange,
+}: MessageListProps) {
   const { currentChannelId } = useApp();
   const listRef = useRef<HTMLDivElement>(null);
   const previousChannelIdRef = useRef<string | null>(null);
   const previousLastMessageIdRef = useRef<string | null>(null);
   const lastMarkedReadRef = useRef<{ channelId: string; messageId: string } | null>(null);
   const isNearBottomRef = useRef(true);
+  const reportedLatestMessageVisibilityRef = useRef<boolean | null>(null);
   const scrollRestoreRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
   const hasMoreHistoryRef = useRef(true);
   const isFetchingOlderRef = useRef(false);
@@ -52,6 +57,13 @@ export default function MessageList({ onReply }: MessageListProps) {
 
   const setHasMoreHistory = (value: boolean) => {
     hasMoreHistoryRef.current = value;
+  };
+
+  const reportLatestMessageVisibility = (visible: boolean) => {
+    if (reportedLatestMessageVisibilityRef.current === visible) return;
+
+    reportedLatestMessageVisibilityRef.current = visible;
+    onLatestMessageVisibilityChange?.(visible);
   };
 
   const markCurrentChannelAsRead = () => {
@@ -77,8 +89,10 @@ export default function MessageList({ onReply }: MessageListProps) {
     const listEl = listRef.current;
     if (!listEl) return;
 
-    isNearBottomRef.current =
+    const isLatestMessageVisible =
       listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight <= SCROLL_EDGE_THRESHOLD;
+    isNearBottomRef.current = isLatestMessageVisible;
+    reportLatestMessageVisibility(isLatestMessageVisible);
   };
 
   const loadOlderMessages = async () => {
@@ -142,7 +156,9 @@ export default function MessageList({ onReply }: MessageListProps) {
     setHasMoreHistory(true);
     isFetchingOlderRef.current = false;
     scrollRestoreRef.current = null;
-    isNearBottomRef.current = true;
+    reportedLatestMessageVisibilityRef.current = null;
+    isNearBottomRef.current = Boolean(currentChannelId);
+    reportLatestMessageVisibility(Boolean(currentChannelId));
     lastMarkedReadRef.current = null;
     setHistoryBanner('hidden');
   }, [currentChannelId]);
@@ -169,21 +185,14 @@ export default function MessageList({ onReply }: MessageListProps) {
       channelId: string;
       message: MessageData;
     }) => {
-      const shouldResetUnreadCount =
-        channelId === currentChannelId && isNearBottomRef.current;
-
       updateMessagesCache(client.cache, channelId, message);
-      updateChannelsCache(client.cache, channelId, message, {
-        activeChannelId: currentChannelId,
-        resetUnreadCount: shouldResetUnreadCount,
-      });
     };
 
     socket.on('new_message', handleNewMessage);
     return () => {
       socket.off('new_message', handleNewMessage);
     };
-  }, [client, currentChannelId]);
+  }, [client]);
 
   useLayoutEffect(() => {
     const listEl = listRef.current;

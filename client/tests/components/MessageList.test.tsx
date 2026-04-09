@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MESSAGE_PAGE_SIZE } from '../../src/graphql/cacheUpdaters';
 import MessageList from '../../src/components/MessageList';
 
@@ -10,7 +10,6 @@ const {
   socketOnMock,
   socketOffMock,
   updateMessagesCacheMock,
-  updateChannelsCacheMock,
   resetChannelUnreadCountMock,
 } = vi.hoisted(() => ({
   useApolloClientMock: vi.fn(),
@@ -18,7 +17,6 @@ const {
   socketOnMock: vi.fn(),
   socketOffMock: vi.fn(),
   updateMessagesCacheMock: vi.fn(),
-  updateChannelsCacheMock: vi.fn(),
   resetChannelUnreadCountMock: vi.fn(),
 }));
 
@@ -40,7 +38,6 @@ vi.mock('../../src/graphql/cacheUpdaters', async () => {
   return {
     ...actual,
     updateMessagesCache: updateMessagesCacheMock,
-    updateChannelsCache: updateChannelsCacheMock,
     resetChannelUnreadCount: resetChannelUnreadCountMock,
   };
 });
@@ -55,8 +52,12 @@ vi.mock('@apollo/client', async () => {
   };
   });
 
-  describe('MessageList', () => {
-  it('does not reset unread count for socket messages from background channels', () => {
+describe('MessageList', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('updates only the message cache for socket messages', () => {
     const cache = {};
     const message = {
       id: 'm2',
@@ -114,10 +115,6 @@ vi.mock('@apollo/client', async () => {
     });
 
     expect(updateMessagesCacheMock).toHaveBeenCalledWith(cache, 'channel-2', message);
-    expect(updateChannelsCacheMock).toHaveBeenCalledWith(cache, 'channel-2', message, {
-      activeChannelId: 'channel-1',
-      resetUnreadCount: false,
-    });
   });
 
   it('shows empty state when there are no messages', () => {
@@ -263,5 +260,72 @@ vi.mock('@apollo/client', async () => {
         }),
       );
     });
+  });
+
+  it('reports whether the latest message is visible', () => {
+    const onLatestMessageVisibilityChange = vi.fn();
+
+    useAppMock.mockReturnValue({
+      currentChannelId: 'channel-1',
+      currentUser: { id: 'u1' },
+    });
+    useApolloClientMock.mockReturnValue({ cache: { updateQuery: vi.fn() } });
+    useQueryMock.mockReturnValue({
+      data: {
+        messages: [
+          {
+            id: 'm1',
+            content: 'Current channel message',
+            createdAt: '2025-01-01T10:00:00.000Z',
+            sender: {
+              id: 'u2',
+              username: 'grace',
+              displayName: 'Grace Hopper',
+              avatarUrl: 'https://example.com/grace.png',
+            },
+            mentions: [],
+            replyTo: null,
+          },
+        ],
+      },
+      loading: false,
+      error: null,
+      fetchMore: vi.fn(),
+    });
+
+    const { container } = render(
+      <MessageList onLatestMessageVisibilityChange={onLatestMessageVisibilityChange} />,
+    );
+    const list = container.querySelector('.message-list') as HTMLDivElement | null;
+
+    expect(list).not.toBeNull();
+
+    Object.defineProperty(list!, 'scrollHeight', {
+      configurable: true,
+      value: 1200,
+      writable: true,
+    });
+    Object.defineProperty(list!, 'clientHeight', {
+      configurable: true,
+      value: 600,
+      writable: true,
+    });
+    Object.defineProperty(list!, 'scrollTop', {
+      configurable: true,
+      value: 0,
+      writable: true,
+    });
+
+    fireEvent.scroll(list!);
+    expect(onLatestMessageVisibilityChange).toHaveBeenLastCalledWith(false);
+
+    Object.defineProperty(list!, 'scrollTop', {
+      configurable: true,
+      value: 600,
+      writable: true,
+    });
+
+    fireEvent.scroll(list!);
+    expect(onLatestMessageVisibilityChange).toHaveBeenLastCalledWith(true);
   });
 });

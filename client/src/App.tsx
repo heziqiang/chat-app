@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { ApolloClient, InMemoryCache, ApolloProvider, HttpLink, ApolloLink } from '@apollo/client';
 import { AppProvider, useApp } from './context/AppContext';
+import type { MessageData } from './chat/types';
 import { getSocket } from './socket';
 import UserPicker from './components/UserPicker';
 import ChannelList from './components/ChannelList';
 import ChannelHeader from './components/ChannelHeader';
 import MessageList from './components/MessageList';
 import MessageComposer from './components/MessageComposer';
-import type { MessageData } from './components/MessageItem';
+import RealtimeChannelSync from './chat/RealtimeChannelSync';
 
 const httpLink = new HttpLink({ uri: '/graphql' });
 
@@ -33,15 +34,21 @@ const apolloClient = new ApolloClient({
 function AppContent() {
   const { currentUser, currentChannelId } = useApp();
   const [replyingTo, setReplyingTo] = useState<MessageData | null>(null);
+  const [isLatestMessageVisible, setIsLatestMessageVisible] = useState(false);
 
   useEffect(() => {
     setReplyingTo(null);
+    setIsLatestMessageVisible(Boolean(currentChannelId));
   }, [currentChannelId]);
 
   if (!currentUser) return <UserPicker />;
 
   return (
     <div className="app-layout">
+      <RealtimeChannelSync
+        currentChannelId={currentChannelId}
+        isLatestMessageVisible={isLatestMessageVisible}
+      />
       <aside className="sidebar">
         <ChannelList />
       </aside>
@@ -49,7 +56,10 @@ function AppContent() {
         {currentChannelId ? (
           <>
             <ChannelHeader />
-            <MessageList onReply={setReplyingTo} />
+            <MessageList
+              onReply={setReplyingTo}
+              onLatestMessageVisibilityChange={setIsLatestMessageVisible}
+            />
             <MessageComposer
               replyingTo={replyingTo}
               onClearReply={() => setReplyingTo(null)}

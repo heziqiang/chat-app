@@ -1,30 +1,7 @@
 import type { ReactNode } from 'react';
+import type { MentionData, MessageData } from '../chat/types';
 import { useApp } from '../context/AppContext';
 import './MessageItem.css';
-
-export interface MentionData {
-  id: string;
-  username: string;
-  displayName: string;
-}
-
-export interface MessageData {
-  id: string;
-  content: string;
-  createdAt: string;
-  sender: {
-    id: string;
-    username: string;
-    displayName: string;
-    avatarUrl: string;
-  };
-  mentions: MentionData[];
-  replyTo: {
-    id: string;
-    content: string;
-    sender: { id: string; displayName: string };
-  } | null;
-}
 
 function isMentionBoundary(char: string | undefined) {
   return !char || /[\s.,!?;:()[\]{}"'`]/.test(char);

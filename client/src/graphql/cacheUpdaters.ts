@@ -1,5 +1,5 @@
 import type { ApolloCache } from '@apollo/client';
-import type { MessageData } from '../components/MessageItem';
+import type { MessageData } from '../chat/types';
 import { GET_MESSAGES, GET_CHANNELS } from './queries';
 
 interface MessageQueryData {

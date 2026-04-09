@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useMutation } from '@apollo/client';
+import type { MentionData, MessageData } from '../chat/types';
 import { useApp } from '../context/AppContext';
 import { SEND_MESSAGE } from '../graphql/queries';
 import { updateMessagesCache, updateChannelsCache } from '../graphql/cacheUpdaters';
-import type { MentionData, MessageData } from './MessageItem';
 import './MessageComposer.css';
 
 interface SendMessageResult {
