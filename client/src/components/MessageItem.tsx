@@ -95,9 +95,10 @@ interface MessageItemProps {
 export default function MessageItem({ message, onReply }: MessageItemProps) {
   const { currentUser } = useApp();
   const isOwn = currentUser?.id === message.sender.id;
+  const canReply = Boolean(onReply);
 
   return (
-    <div className={`message-item ${isOwn ? 'own' : 'other'}`}>
+    <div className={`message-item ${isOwn ? 'own' : 'other'} ${canReply ? 'has-reply-action' : ''}`}>
       <img
         className="message-avatar"
         src={message.sender.avatarUrl}
@@ -112,10 +113,11 @@ export default function MessageItem({ message, onReply }: MessageItemProps) {
           <div className="message-bubble">
             <p className="message-content">{renderMessageContent(message.content, message.mentions)}</p>
           </div>
-          {onReply && (
+          {canReply && (
             <button
+              type="button"
               className="message-reply-btn"
-              onClick={() => onReply(message)}
+              onClick={() => onReply?.(message)}
               aria-label="Reply"
             >
               <svg viewBox="0 0 16 16" aria-hidden="true">
