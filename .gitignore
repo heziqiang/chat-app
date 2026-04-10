@@ -9,6 +9,7 @@ coverage/
 *.tsbuildinfo
 .DS_Store
 .claude/
+scripts/deploy.sh
 assignment/
 plan/
 CLAUDE.md
