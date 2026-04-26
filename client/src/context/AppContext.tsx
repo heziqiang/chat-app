@@ -46,7 +46,7 @@ interface AppContextValue {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
-const STORAGE_KEY = 'gradual-chat-userId';
+const STORAGE_KEY = 'realtime-chat-userId';
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUserState] = useState<User | null>(null);

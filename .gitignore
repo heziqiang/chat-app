@@ -10,7 +10,6 @@ coverage/
 .DS_Store
 .claude/
 scripts/deploy.sh
-assignment/
 plan/
 CLAUDE.md
 AGENTS.md

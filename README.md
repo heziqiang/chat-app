@@ -1,4 +1,4 @@
-# Gradual Chat
+# Realtime Chat App
 
 A real-time channel messaging app built as a full-stack demo. Supports group channels, direct messages, quote replies, unread tracking, and live message sync.
 

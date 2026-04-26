@@ -13,7 +13,7 @@ import RealtimeChannelSync from './chat/RealtimeChannelSync';
 const httpLink = new HttpLink({ uri: '/graphql' });
 
 const authLink = new ApolloLink((operation, forward) => {
-  const userId = sessionStorage.getItem('gradual-chat-userId');
+  const userId = sessionStorage.getItem('realtime-chat-userId');
   const headers: Record<string, string> = {};
   if (userId) {
     headers['x-user-id'] = userId;

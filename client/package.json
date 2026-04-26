@@ -1,5 +1,5 @@
 {
-  "name": "gradual-chat-client",
+  "name": "realtime-chat-client",
   "version": "1.0.0",
   "private": true,
   "type": "module",

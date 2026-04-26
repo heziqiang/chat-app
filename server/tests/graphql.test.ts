@@ -5,7 +5,7 @@ import { createApp, connectToDatabase, syncModelIndexes } from '../src/index';
 import { clearDatabase, seedDatabase } from '../src/seed';
 
 const TEST_MONGODB_URI =
-  process.env.TEST_MONGODB_URI || 'mongodb://127.0.0.1:27017/gradual-chat-test';
+  process.env.TEST_MONGODB_URI || 'mongodb://127.0.0.1:27017/realtime-chat-test';
 
 describe('GraphQL API', () => {
   let api: SuperTest<Test>;

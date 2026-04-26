@@ -1,16 +1,14 @@
-# Gradual Chat — 技术设计文档
+# Realtime Chat App — 技术设计文档
 
 ## 1. 项目概述
 
-参照 Gradual 社区平台的 Chat 交互设计，从零实现一个独立的频道消息系统，支持消息收发与实时同步。
+这是一个独立的频道消息系统，用于展示全栈实时聊天应用的核心设计与实现，支持消息收发与实时同步。
 
 **技术栈**：React.js (TypeScript) / Node.js (TypeScript) / MongoDB / GraphQL / Socket.io
 
 **用户身份**：这里不做认证/登录流程，直接前端组件选择用户，`userId` 存 sessionStorage（浏览器 Tab 隔离），请求带 `x-user-id` header，Socket.io 连接走 `auth` 参数。开两个 tab 选不同用户即可验证实时同步。
 
 ## 2. UI 结构
-
-设计稿 [Figma](https://www.figma.com/design/CBKcxWGEJGFe05ZsbgZZ2z/Full-Stack-Developer-Assignment?node-id=0-394)。
 
 经典左右分栏：左侧频道列表（名称、头像、最后消息预览、未读 badge），右侧消息区 + 底部输入框。
 
